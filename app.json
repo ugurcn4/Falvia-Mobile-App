@@ -1,29 +1,78 @@
 {
   "expo": {
-    "name": "FalUygulamasi",
-    "slug": "FalUygulamasi",
-    "version": "1.0.0",
+    "name": "Falvia",
+    "slug": "falvia",
+    "version": "1.1.1",
+    "versionCode": 11,
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/görseller/yeni-logo.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/görseller/yeni-logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.falvia.app"
     },
     "android": {
+      "package": "com.falvia.app",
+      "versionCode": 11,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/görseller/yeni-logo.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "com.android.vending.BILLING"
+      ],
+      "googleServicesFile": "./google-services.json"
     },
+    "notification": {
+      "androidMode": "default",
+      "androidCollapsedTitle": "Falvia"
+    },
+    "scheme": "com.falvia.app",
     "web": {
-      "favicon": "./assets/favicon.png"
-    }
+      "favicon": "./assets/görseller/yeni-logo.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "43ad60e6-bcbd-4f9e-a763-9ad42afeaf05"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/3fb12fbb-718a-4bf6-8daa-5e5b35b651a4"
+    },
+    "owner": "ugurrucr",
+    "plugins": [
+      "@react-native-firebase/app",
+      "@react-native-firebase/messaging",
+      [
+        "expo-notifications",
+        {
+          "mode": "core"
+        }
+      ],
+      [
+        "@react-native-google-signin/google-signin"
+      ],
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-2358689887265683~7405543183"
+        }
+      ]
+    ]
   }
 }

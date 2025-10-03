@@ -19,6 +19,13 @@ export const loginStyles = StyleSheet.create({
     marginTop: spacing.xxxl + spacing.lg,
     marginBottom: spacing.xl,
   },
+  logo: {
+    width: 120,
+    height: 120,
+    marginBottom: spacing.lg,
+    borderRadius: 60,
+    ...shadows.md,
+  },
   appName: {
     fontSize: typography.fontSize.title,
     fontWeight: typography.fontWeight.bold,
@@ -52,7 +59,7 @@ export const loginStyles = StyleSheet.create({
   },
   inputIcon: {
     marginRight: spacing.sm,
-    color: colors.primary,
+    color: colors.secondary,
   },
   input: {
     flex: 1,
@@ -69,7 +76,7 @@ export const loginStyles = StyleSheet.create({
     paddingVertical: spacing.xs,
   },
   forgotPasswordText: {
-    color: colors.primary,
+    color: colors.secondary,
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.medium,
   },
@@ -96,17 +103,17 @@ export const loginStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  orContainer: {
+  separatorContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: spacing.xl,
+    marginVertical: spacing.lg,
   },
-  divider: {
+  separatorLine: {
     flex: 1,
     height: 1,
     backgroundColor: colors.border,
   },
-  orText: {
+  separatorText: {
     color: colors.text.tertiary,
     paddingHorizontal: spacing.md,
     fontSize: typography.fontSize.sm,
@@ -119,7 +126,7 @@ export const loginStyles = StyleSheet.create({
     height: 56,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.xxxl,
+    marginBottom: spacing.lg,
     ...shadows.sm,
     borderWidth: 1,
     borderColor: colors.border,
@@ -142,7 +149,7 @@ export const loginStyles = StyleSheet.create({
     fontSize: typography.fontSize.md,
   },
   registerLink: {
-    color: colors.primary,
+    color: colors.secondary,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.bold,
     marginLeft: spacing.xs,
@@ -172,7 +179,7 @@ export const loginStyles = StyleSheet.create({
     borderColor: colors.border,
   },
   featureIcon: {
-    color: colors.primary,
+    color: colors.secondary,
   },
   featureText: {
     fontSize: typography.fontSize.xs,

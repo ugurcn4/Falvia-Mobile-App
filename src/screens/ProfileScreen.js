@@ -9,7 +9,9 @@ import {
   StatusBar, 
   ActivityIndicator,
   RefreshControl,
-  Platform
+  Platform,
+  Linking,
+  StyleSheet
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons, FontAwesome5, MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
@@ -17,20 +19,27 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../../lib/supabase';
 import colors from '../styles/colors';
 import { useFocusEffect } from '@react-navigation/native';
-import * as ImagePicker from 'expo-image-picker';
+import DailyLoginStatusCard from '../components/DailyLoginStatusCard';
+import DailyLoginRewardModal from '../components/DailyLoginRewardModal';
+import dailyLoginService from '../services/dailyLoginService';
+import PremiumTrialCard from '../components/PremiumTrialCard';
+import { checkUserSubscriptionWithTrial } from '../services/supabaseService';
+import { TrialService } from '../services/trialService';
 
 const ProfileScreen = ({ navigation, route }) => {
   const { user, logout } = useAuth();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [userData, setUserData] = useState(null);
-  const [imageUploading, setImageUploading] = useState(false);
+
   
   const [stats, setStats] = useState({
     tokens: 0,
     fortuneCount: 0,
     favoriteCount: 0
   });
+  const [subscriptionType, setSubscriptionType] = useState('free');
+  const [showDailyLoginModal, setShowDailyLoginModal] = useState(false);
 
   // Kullanıcı verilerini Supabase'den al
   const fetchUserData = async () => {
@@ -48,26 +57,25 @@ const ProfileScreen = ({ navigation, route }) => {
       // Kullanıcı profil bilgilerini getir
       const { data: profile, error } = await supabase
         .from('users')
-        .select('*')
+        .select('id, email, first_name, last_name, full_name, birth_date, birth_place, profile_image, zodiac_sign, rising_sign, gender, marital_status, favorite_fortune_teller, token_balance, is_admin, is_premium, subscription_type, subscription_end_date, subscription_auto_renew, created_at, updated_at')
         .eq('id', authUser.id)
         .single();
       
       if (error) {
         console.error('Profil bilgileri getirilemedi:', error);
-        // Hata durumunda da temel bilgileri göster
-        setUserData({
-          id: authUser.id,
-          email: authUser.email,
-          first_name: authUser.user_metadata?.first_name || '',
-          last_name: authUser.user_metadata?.last_name || '',
-          full_name: authUser.user_metadata?.full_name || authUser.email.split('@')[0],
-          profile_image: authUser.user_metadata?.avatar_url || null,
-          token_balance: 0,
-          is_admin: false
-        });
-        setLoading(false);
-        return;
       }
+
+      // Hata olsa bile mevcut verileri kullan, yoksa auth verilerini kullan
+      const userData = profile || {
+        id: authUser.id,
+        email: authUser.email,
+        first_name: authUser.user_metadata?.first_name || '',
+        last_name: authUser.user_metadata?.last_name || '',
+        full_name: authUser.user_metadata?.full_name || authUser.email.split('@')[0],
+        profile_image: authUser.user_metadata?.avatar_url || null,
+        token_balance: 0,
+        is_admin: false
+      };
       
       // Kullanıcının fal sayısını getir
       const { count: fortuneCount, error: fortuneError } = await supabase
@@ -75,19 +83,34 @@ const ProfileScreen = ({ navigation, route }) => {
         .select('*', { count: 'exact', head: true })
         .eq('user_id', authUser.id);
       
-      // Kullanıcının favori sayısını getir
-      const { count: favoriteCount, error: favoriteError } = await supabase
-        .from('favorites')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', authUser.id);
+      // Kullanıcının favori sayısını getir (eğer favorites tablosu varsa)
+      let favoriteCount = 0;
+      try {
+        const { count, error: favoriteError } = await supabase
+          .from('favorites')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', authUser.id);
+        favoriteCount = count || 0;
+      } catch (error) {
+        // Favorites tablosu yoksa 0 olarak ayarla
+        favoriteCount = 0;
+      }
       
       // Kullanıcı verileri ve istatistiklerini ayarla
-      setUserData(profile);
+      setUserData(userData);
+      setSubscriptionType(userData?.subscription_type || 'free');
       setStats({
-        tokens: profile?.token_balance || 0,
+        tokens: userData?.token_balance || 0,
         fortuneCount: fortuneCount || 0,
         favoriteCount: favoriteCount || 0
       });
+      
+      // Günlük giriş durumunu da kontrol et (arka planda)
+      if (authUser?.id) {
+        dailyLoginService.getCurrentStatus(authUser.id).catch(error => {
+          console.error('Günlük giriş durumu kontrol edilirken hata:', error);
+        });
+      }
       
     } catch (error) {
       console.error('Veri çekerken hata:', error);
@@ -97,164 +120,7 @@ const ProfileScreen = ({ navigation, route }) => {
     }
   };
 
-  // Profil fotoğrafı seçme fonksiyonu
-  const selectProfileImage = async () => {
-    try {
-      // Kamera rulo izni iste
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      
-      if (status !== 'granted') {
-        Alert.alert(
-          'İzin Gerekli',
-          'Profil fotoğrafı seçmek için galeri erişim iznine ihtiyacımız var.',
-          [{ text: 'Tamam' }]
-        );
-        return;
-      }
 
-      // Seçenekleri göster
-      Alert.alert(
-        'Profil Fotoğrafı',
-        'Profil fotoğrafınızı nasıl güncellemek istersiniz?',
-        [
-          { text: 'İptal', style: 'cancel' },
-          { text: 'Galeriden Seç', onPress: () => openImagePicker() },
-          { text: 'Kamera', onPress: () => openCamera() }
-        ]
-      );
-    } catch (error) {
-      console.error('Profil fotoğrafı seçme hatası:', error);
-      Alert.alert('Hata', 'Profil fotoğrafı seçilirken bir hata oluştu.');
-    }
-  };
-
-  // Galeriden fotoğraf seçme
-  const openImagePicker = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        uploadProfileImage(result.assets[0].uri);
-      }
-    } catch (error) {
-      console.error('Galeri hatası:', error);
-      Alert.alert('Hata', 'Galeriden fotoğraf seçilirken bir hata oluştu.');
-    }
-  };
-
-  // Kameradan fotoğraf çekme
-  const openCamera = async () => {
-    try {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      
-      if (status !== 'granted') {
-        Alert.alert(
-          'İzin Gerekli',
-          'Fotoğraf çekmek için kamera erişim iznine ihtiyacımız var.',
-          [{ text: 'Tamam' }]
-        );
-        return;
-      }
-
-      const result = await ImagePicker.launchCameraAsync({
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        uploadProfileImage(result.assets[0].uri);
-      }
-    } catch (error) {
-      console.error('Kamera hatası:', error);
-      Alert.alert('Hata', 'Kameradan fotoğraf çekilirken bir hata oluştu.');
-    }
-  };
-
-  // Profil fotoğrafını Supabase'e yükleme
-  const uploadProfileImage = async (imageUri) => {
-    try {
-      setImageUploading(true);
-      
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser) {
-        Alert.alert('Hata', 'Kullanıcı oturumu bulunamadı.');
-        return;
-      }
-
-      // Dosya uzantısını al
-      const fileExt = imageUri.split('.').pop();
-      const fileName = `${authUser.id}-${Date.now()}.${fileExt}`;
-      const filePath = `${authUser.id}/${fileName}`;
-
-      // Fotoğrafı blob'a dönüştür
-      const response = await fetch(imageUri);
-      const blob = await response.blob();
-
-      // Önce eski fotoğrafı sil (varsa)
-      if (userData?.profile_image) {
-        try {
-          const oldFileName = userData.profile_image.split('/').pop();
-          const oldFilePath = `${authUser.id}/${oldFileName}`;
-          await supabase.storage
-            .from('profile-images')
-            .remove([oldFilePath]);
-        } catch (error) {
-          console.log('Eski fotoğraf silinemedi:', error);
-        }
-      }
-
-      // Supabase Storage'a yükle
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('profile-images')
-        .upload(filePath, blob, {
-          cacheControl: '3600',
-          upsert: true
-        });
-
-      if (uploadError) {
-        console.error('Yükleme hatası:', uploadError);
-        Alert.alert('Hata', `Fotoğraf yüklenirken bir hata oluştu: ${uploadError.message}`);
-        return;
-      }
-
-      // Yüklenen fotoğrafın public URL'sini al
-      const { data: { publicUrl } } = supabase.storage
-        .from('profile-images')
-        .getPublicUrl(filePath);
-
-      // Kullanıcı profilini güncelle
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({ profile_image: publicUrl })
-        .eq('id', authUser.id);
-
-      if (updateError) {
-        console.error('Profil günceleme hatası:', updateError);
-        Alert.alert('Hata', 'Profil güncellenirken bir hata oluştu.');
-        return;
-      }
-
-      // Yerel state'i güncelle
-      setUserData(prevData => ({
-        ...prevData,
-        profile_image: publicUrl
-      }));
-
-      Alert.alert('Başarılı', 'Profil fotoğrafınız başarıyla güncellendi.');
-      
-    } catch (error) {
-      console.error('Profil fotoğrafı yükleme hatası:', error);
-      Alert.alert('Hata', `Profil fotoğrafı yüklenirken bir hata oluştu: ${error.message}`);
-    } finally {
-      setImageUploading(false);
-    }
-  };
 
   // Edit ekranından gelen güncellemeleri kontrol et
   const checkForProfileUpdates = () => {
@@ -278,7 +144,7 @@ const ProfileScreen = ({ navigation, route }) => {
   
   // Eğer userData yoksa ve AuthContext'ten user varsa, onu kullan
   useEffect(() => {
-    if (!userData && user && user.profile) {
+    if (!userData && user?.profile) {
       setUserData(user.profile);
     }
   }, [userData, user]);
@@ -291,9 +157,26 @@ const ProfileScreen = ({ navigation, route }) => {
   );
 
   // Sayfayı yenile
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true);
-    fetchUserData();
+    
+    try {
+      // Önce günlük giriş ödülü kontrolü yap
+      if (user?.id) {
+        const dailyLoginResult = await dailyLoginService.checkAndRewardDailyLogin(user.id);
+        if (dailyLoginResult.success) {
+          // Ödül alındıysa modal'ı göster
+          setShowDailyLoginModal(true);
+        }
+      }
+      
+      // Sonra tüm verileri yenile
+      await fetchUserData();
+    } catch (error) {
+      console.error('Yenileme sırasında hata:', error);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   // Çıkış yapma işlemi
@@ -344,10 +227,18 @@ const ProfileScreen = ({ navigation, route }) => {
       icon: 'history', 
       iconType: 'fontawesome',
       color: '#9b59b6',
-      onPress: () => navigation.navigate('FortuneHistory')
+      onPress: () => navigation.navigate('FalScreen')
     },
     { 
       id: 3, 
+      title: 'Arkadaş Davet Et', 
+      icon: 'person-add', 
+      iconType: 'ionicons',
+      color: colors.secondary,
+      onPress: () => navigation.navigate('ReferralInvite')
+    },
+    { 
+      id: 4, 
       title: 'Jeton Satın Al', 
       icon: 'diamond', 
       iconType: 'ionicons',
@@ -355,28 +246,20 @@ const ProfileScreen = ({ navigation, route }) => {
       onPress: () => navigation.navigate('BuyTokens')
     },
     { 
-      id: 4, 
-      title: 'Favorilerim', 
-      icon: 'heart', 
+      id: 5, 
+      title: 'Uygulama Tanıtımı', 
+      icon: 'play-circle', 
       iconType: 'ionicons',
       color: '#e74c3c',
-      onPress: () => navigation.navigate('Favorites')
+      onPress: () => navigation.navigate('Onboarding')
     },
     { 
-      id: 5, 
+      id: 6, 
       title: 'Bildirimler', 
       icon: 'notifications', 
       iconType: 'ionicons',
       color: '#f39c12',
       onPress: () => navigation.navigate('Notifications')
-    },
-    { 
-      id: 6, 
-      title: 'Ayarlar', 
-      icon: 'settings', 
-      iconType: 'ionicons',
-      color: '#1abc9c',
-      onPress: () => navigation.navigate('Settings')
     },
     { 
       id: 7, 
@@ -401,6 +284,19 @@ const ProfileScreen = ({ navigation, route }) => {
   // Final menu items (admin ise admin paneli eklenir)
   const finalMenuItems = userData?.is_admin ? [...menuItems, adminMenuItem] : menuItems;
 
+  // Hesap türü için renk ve metin
+  const getSubscriptionInfo = (type) => {
+    switch (type) {
+      case 'standart':
+        return { text: 'Standart Üye', color: colors.success, bgColor: 'rgba(11, 230, 102, 0.15)' };
+      case 'premium':
+        return { text: 'Premium Üye', color: colors.gold, bgColor: 'rgba(255, 217, 0, 0.74)' };
+      case 'free':
+      default:
+        return { text: 'Ücretsiz Üye', color: colors.info, bgColor: 'rgba(16, 135, 214, 0.15)' };
+    }
+  };
+
   // İkon render fonksiyonu
   const renderIcon = (item) => {
     if (item.iconType === 'fontawesome') {
@@ -423,25 +319,6 @@ const ProfileScreen = ({ navigation, route }) => {
     );
   }
 
-  // Burç simgesi getirme fonksiyonu
-  const getZodiacIcon = (zodiac) => {
-    switch(zodiac?.toLowerCase()) {
-      case 'koç': return 'star-shooting';
-      case 'boğa': return 'star-face';
-      case 'ikizler': return 'star-three-points';
-      case 'yengeç': return 'star-four-points';
-      case 'aslan': return 'star-circle';
-      case 'başak': return 'star-box';
-      case 'terazi': return 'star-check';
-      case 'akrep': return 'star-plus';
-      case 'yay': return 'star-david';
-      case 'oğlak': return 'star-outline';
-      case 'kova': return 'star-half';
-      case 'balık': return 'star-crescent';
-      default: return 'zodiac';
-    }
-  };
-
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
@@ -463,8 +340,8 @@ const ProfileScreen = ({ navigation, route }) => {
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={{
-            paddingTop: 60,
-            paddingBottom: 30,
+            paddingTop: 50,
+            paddingBottom: 20,
             borderBottomLeftRadius: 30,
             borderBottomRightRadius: 30,
           }}
@@ -478,57 +355,31 @@ const ProfileScreen = ({ navigation, route }) => {
               backgroundColor: 'rgba(255,255,255,0.2)',
               padding: 5,
             }}>
-              <TouchableOpacity onPress={selectProfileImage}>
-                {userData?.profile_image ? (
-                  <Image
-                    source={{ uri: userData.profile_image }}
-                    style={{
-                      width: 100,
-                      height: 100,
-                      borderRadius: 50,
-                      borderWidth: 2,
-                      borderColor: colors.secondary,
-                    }}
-                  />
-                ) : (
-                  <View style={{
+              {userData?.profile_image ? (
+                <Image
+                  source={{ uri: userData.profile_image }}
+                  style={{
                     width: 100,
                     height: 100,
                     borderRadius: 50,
-                    backgroundColor: colors.secondary,
-                    justifyContent: 'center',
-                    alignItems: 'center',
                     borderWidth: 2,
-                    borderColor: colors.primary,
-                  }}>
-                    <Ionicons name="person" size={50} color={colors.text.light} />
-                  </View>
-                )}
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={{
-                  position: 'absolute',
-                  bottom: 0,
-                  right: 0,
-                  backgroundColor: colors.secondary,
-                  width: 32,
-                  height: 32,
-                  borderRadius: 16,
+                    borderColor: colors.secondary,
+                  }}
+                />
+              ) : (
+                <View style={{
+                  width: 100,
+                  height: 100,
+                  borderRadius: 50,
+                  backgroundColor: colors.primary,
                   justifyContent: 'center',
                   alignItems: 'center',
                   borderWidth: 2,
-                  borderColor: colors.primary,
-                }}
-                onPress={selectProfileImage}
-                disabled={imageUploading}
-              >
-                {imageUploading ? (
-                  <ActivityIndicator size="small" color={colors.text.light} />
-                ) : (
-                  <Ionicons name="camera" size={16} color={colors.text.light} />
-                )}
-              </TouchableOpacity>
+                  borderColor: colors.secondary,
+                }}>
+                  <Ionicons name="person" size={50} color={colors.text.light} />
+                </View>
+              )}
             </View>
 
             {/* Kullanıcı Bilgileri */}
@@ -538,6 +389,26 @@ const ProfileScreen = ({ navigation, route }) => {
             <Text style={{ fontSize: 14, color: colors.text.secondary, marginTop: 5 }}>
               {userData?.email || 'E-posta yok'}
             </Text>
+
+            {/* Hesap Türü */}
+            <View style={{
+              marginTop: 10,
+              paddingHorizontal: 15,
+              paddingVertical: 6,
+              borderRadius: 20,
+              backgroundColor: getSubscriptionInfo(subscriptionType).bgColor,
+              borderWidth: 1,
+              borderColor: getSubscriptionInfo(subscriptionType).color,
+            }}>
+              <Text style={{
+                fontSize: 12,
+                fontWeight: 'bold',
+                color: getSubscriptionInfo(subscriptionType).color,
+                textAlign: 'center',
+              }}>
+                {getSubscriptionInfo(subscriptionType).text}
+              </Text>
+            </View>
 
             {/* Üyelik Tarihi */}
             <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10 }}>
@@ -560,7 +431,7 @@ const ProfileScreen = ({ navigation, route }) => {
             {/* İstatistikler */}
             <View style={{ 
               flexDirection: 'row', 
-              marginTop: 25, 
+              marginTop: 20, 
               width: '90%', 
               backgroundColor: 'rgba(0,0,0,0.2)',
               borderRadius: 15,
@@ -605,26 +476,84 @@ const ProfileScreen = ({ navigation, route }) => {
 
               {/* Ayraç */}
               <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.2)' }} />
-
-              {/* Favoriler */}
-              <View style={{ flex: 1, alignItems: 'center' }}>
-                <View style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 20,
-                  backgroundColor: 'rgba(255,255,255,0.1)',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  marginBottom: 8,
-                }}>
-                  <Ionicons name="heart" size={22} color="#e74c3c" />
-                </View>
-                <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text.light }}>{stats.favoriteCount}</Text>
-                <Text style={{ fontSize: 12, color: colors.text.secondary }}>Favori</Text>
-              </View>
             </View>
           </View>
         </LinearGradient>
+
+        {/* Günlük Giriş Ödülü Kartı */}
+        <DailyLoginStatusCard
+          userId={user?.id}
+          onClaimReward={async () => {
+            try {
+              // Önce günlük giriş ödülü kontrolü yap
+              const result = await dailyLoginService.checkAndRewardDailyLogin(user.id);
+              if (result.success) {
+                // Ödül alındıysa kullanıcı verilerini güncelle
+                setUserData(prevData => ({
+                  ...prevData,
+                  token_balance: result.data.totalBalance
+                }));
+                setStats(prevStats => ({
+                  ...prevStats,
+                  tokens: result.data.totalBalance
+                }));
+              }
+              // Modal'ı göster
+              setShowDailyLoginModal(true);
+            } catch (error) {
+              console.error('Günlük giriş ödülü alınırken hata:', error);
+              // Hata olsa bile modal'ı göster
+              setShowDailyLoginModal(true);
+            }
+          }}
+        />
+
+        {/* Premium Üyelik Deneme Kartı */}
+        <PremiumTrialCard
+          isVisible={!userData?.is_premium && subscriptionType === 'free'}
+          onTrialStarted={async (result) => {
+            // Deneme başladığında profil verilerini yenile
+            await fetchUserData();
+          }}
+          onTrialExpired={async () => {
+            // Deneme bittiğinde profil verilerini yenile
+            await fetchUserData();
+            Alert.alert(
+              'Deneme Süresi Sona Erdi',
+              'Ücretsiz deneme süreniz sona erdi. Premium özelliklerden yararlanmaya devam etmek için mağazayı ziyaret edebilirsiniz.',
+              [
+                { text: 'Tamam', style: 'cancel' },
+                { text: 'Mağaza', onPress: () => navigation.navigate('TokenStore') }
+              ]
+            );
+          }}
+          onLearnMore={() => {
+            // Premium özellikler hakkında detay bilgi
+            Alert.alert(
+              "Premium Özellikler",
+              "• Sınırsız fal baktır\n• Öncelikli falcı seçimi\n• Günlük bonus jetonlar\n• Reklamsız deneyim\n• Özel falcılar\n• Hızlı yanıt süreleri",
+              [{ text: "Anladım" }]
+            );
+          }}
+        />
+
+        {/* Günlük Giriş Ödülü Modal */}
+        <DailyLoginRewardModal
+          visible={showDailyLoginModal}
+          onClose={() => setShowDailyLoginModal(false)}
+          userId={user?.id}
+          onRewardClaimed={(rewardData) => {
+            // Ödül alındığında kullanıcı verilerini güncelle
+            setUserData(prevData => ({
+              ...prevData,
+              token_balance: rewardData.totalBalance
+            }));
+            setStats(prevStats => ({
+              ...prevStats,
+              tokens: rewardData.totalBalance
+            }));
+          }}
+        />
 
         {/* Hızlı Erişim */}
         <View style={{
@@ -660,7 +589,7 @@ const ProfileScreen = ({ navigation, route }) => {
             <Text style={{ fontSize: 12, color: colors.text.primary }}>Jeton Al</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity style={{ alignItems: 'center' }} onPress={() => navigation.navigate('NewFortune')}>
+          <TouchableOpacity style={{ alignItems: 'center' }} onPress={() => navigation.navigate('FalScreen')}>
             <LinearGradient
               colors={[colors.secondary, colors.primary]}
               style={{
@@ -677,7 +606,7 @@ const ProfileScreen = ({ navigation, route }) => {
             <Text style={{ fontSize: 12, color: colors.text.primary }}>Fal Baktır</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity style={{ alignItems: 'center' }} onPress={() => navigation.navigate('Promotions')}>
+          <TouchableOpacity style={{ alignItems: 'center' }} onPress={() => navigation.navigate('BuyTokens')}>
             <LinearGradient
               colors={['#e74c3c', '#c0392b']}
               style={{
@@ -735,7 +664,7 @@ const ProfileScreen = ({ navigation, route }) => {
                 </View>
                 <View>
                   <Text style={{ fontSize: 11, color: colors.text.tertiary }}>Burç</Text>
-                  <Text style={{ fontSize: 13, color: colors.text.primary }}>{userData?.zodiac_sign || 'Belirtilmemiş'}</Text>
+                  <Text style={{ fontSize: 13, color: colors.text.primary }}>{userData?.zodiac_sign || '-'}</Text>
                 </View>
               </View>
 
@@ -754,7 +683,7 @@ const ProfileScreen = ({ navigation, route }) => {
                 </View>
                 <View>
                   <Text style={{ fontSize: 11, color: colors.text.tertiary }}>Cinsiyet</Text>
-                  <Text style={{ fontSize: 13, color: colors.text.primary }}>{userData?.gender || 'Belirtilmemiş'}</Text>
+                  <Text style={{ fontSize: 13, color: colors.text.primary }}>{userData?.gender || '-'}</Text>
                 </View>
               </View>
 
@@ -774,7 +703,7 @@ const ProfileScreen = ({ navigation, route }) => {
                 <View>
                   <Text style={{ fontSize: 11, color: colors.text.tertiary }}>Doğum Yeri</Text>
                   <Text style={{ fontSize: 13, color: colors.text.primary }}>
-                    {userData?.birth_place || 'Belirtilmemiş'}
+                    {userData?.birth_place || '-'}
                   </Text>
                 </View>
               </View>
@@ -797,7 +726,7 @@ const ProfileScreen = ({ navigation, route }) => {
                 </View>
                 <View>
                   <Text style={{ fontSize: 11, color: colors.text.tertiary }}>Yükselen</Text>
-                  <Text style={{ fontSize: 13, color: colors.text.primary }}>{userData?.rising_sign || 'Belirtilmemiş'}</Text>
+                  <Text style={{ fontSize: 13, color: colors.text.primary }}>{userData?.rising_sign || '-'}</Text>
                 </View>
               </View>
 
@@ -816,7 +745,7 @@ const ProfileScreen = ({ navigation, route }) => {
                 </View>
                 <View>
                   <Text style={{ fontSize: 11, color: colors.text.tertiary }}>Medeni Durum</Text>
-                  <Text style={{ fontSize: 13, color: colors.text.primary }}>{userData?.marital_status || 'Belirtilmemiş'}</Text>
+                  <Text style={{ fontSize: 13, color: colors.text.primary }}>{userData?.marital_status || '-'}</Text>
                 </View>
               </View>
               
@@ -836,7 +765,7 @@ const ProfileScreen = ({ navigation, route }) => {
                 <View>
                   <Text style={{ fontSize: 11, color: colors.text.tertiary }}>Favori Falcı</Text>
                   <Text style={{ fontSize: 13, color: colors.text.primary }} numberOfLines={1} ellipsizeMode="tail">
-                    {userData?.favorite_fortune_teller || 'Belirtilmemiş'}
+                    {userData?.favorite_fortune_teller || '-'}
                   </Text>
                 </View>
               </View>
@@ -882,11 +811,52 @@ const ProfileScreen = ({ navigation, route }) => {
               }}>
                 {renderIcon(item)}
               </View>
-              <Text style={{ flex: 1, fontSize: 16, color: colors.text.primary }}>{item.title}</Text>
+              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={{ fontSize: 16, color: colors.text.primary }}>{item.title}</Text>
+                {item.id === 3 && (
+                  <View style={styles.jetonBadge}>
+                    <MaterialCommunityIcons name="diamond" size={10} color="#fff" />
+                    <Text style={styles.jetonBadgeText}>Jeton Kazan</Text>
+                  </View>
+                )}
+              </View>
               <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
             </TouchableOpacity>
           ))}
         </View>
+
+        {/* Gizlilik Politikası Kısmı */}
+        <TouchableOpacity
+          style={{
+            backgroundColor: colors.card,
+            borderRadius: 12,
+            marginHorizontal: 20,
+            padding: 14,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderWidth: 1,
+            borderColor: colors.info,
+            shadowColor: colors.shadow,
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.12,
+            shadowRadius: 3,
+            elevation: 2,
+            marginBottom: 16,
+          }}
+          onPress={() => {
+            const url = 'https://sites.google.com/view/falvia/ana-sayfa';
+            if (Platform.OS === 'web') {
+              window.open(url, '_blank');
+            } else {
+              Linking.openURL(url);
+            }
+          }}
+        >
+          <Ionicons name="shield-checkmark-outline" size={18} color={colors.info} style={{ marginRight: 8 }} />
+          <Text style={{ color: colors.info, fontSize: 15, fontWeight: 'bold' }}>Gizlilik Politikası</Text>
+          <Ionicons name="open-outline" size={16} color={colors.info} style={{ marginLeft: 8 }} />
+        </TouchableOpacity>
 
         {/* Çıkış Yap Butonu */}
         <TouchableOpacity 
@@ -896,7 +866,7 @@ const ProfileScreen = ({ navigation, route }) => {
             borderRadius: 15,
             padding: 15,
             margin: 20,
-            marginTop: 10,
+            marginTop: 0,
             alignItems: 'center',
             justifyContent: 'center',
             shadowColor: colors.shadow,
@@ -931,5 +901,28 @@ const ProfileScreen = ({ navigation, route }) => {
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  jetonBadge: {
+    backgroundColor: '#e74c3c',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    marginLeft: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  jetonBadgeText: {
+    color: '#fff',
+    fontSize: 8,
+    fontWeight: 'bold',
+    marginLeft: 3,
+  },
+});
 
 export default ProfileScreen; 

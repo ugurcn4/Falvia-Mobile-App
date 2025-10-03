@@ -54,7 +54,7 @@ export const forgotPasswordStyles = StyleSheet.create({
   },
   inputIcon: {
     marginRight: spacing.sm,
-    color: colors.primary,
+    color: colors.secondary,
   },
   input: {
     flex: 1,
@@ -96,7 +96,7 @@ export const forgotPasswordStyles = StyleSheet.create({
     fontSize: typography.fontSize.md,
   },
   backLink: {
-    color: colors.primary,
+    color: colors.secondary,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.bold,
     marginLeft: spacing.xs,

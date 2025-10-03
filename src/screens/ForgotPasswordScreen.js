@@ -73,7 +73,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
         
         <View style={forgotPasswordStyles.formContainer}>
           <View style={forgotPasswordStyles.inputContainer}>
-            <Ionicons name="mail-outline" size={22} color={colors.primary} style={forgotPasswordStyles.inputIcon} />
+            <Ionicons name="mail-outline" size={22} color={colors.secondary} style={forgotPasswordStyles.inputIcon} />
             <TextInput
               style={forgotPasswordStyles.input}
               placeholder="E-posta"

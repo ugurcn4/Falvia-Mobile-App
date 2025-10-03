@@ -42,7 +42,7 @@ const SupportScreen = ({ navigation }) => {
     {
       id: 3,
       question: 'Falımın sonucunu ne zaman görebilirim?',
-      answer: 'Falcılarımız gönderdiğiniz falları genellikle 2-8 dakika içerisinde yanıtlar. Falınızın durumunu "Fal Geçmişim" bölümünden takip edebilirsiniz. Falınız yorumlandığında size bildirim gönderilecektir.'
+              answer: 'Falcılarımız gönderdiğiniz falları genellikle 20-30 dakika içerisinde yanıtlar. Falınızın durumunu "Fal Geçmişim" bölümünden takip edebilirsiniz. Falınız yorumlandığında size bildirim gönderilecektir.'
     },
     {
       id: 4,
@@ -66,30 +66,23 @@ const SupportScreen = ({ navigation }) => {
     {
       id: 1,
       title: 'E-posta',
-      value: 'destek@faluygulamasi.com',
+      value: 'faluygulamasi34@gmail.com',
       icon: 'mail',
       color: '#3498db',
     },
     {
       id: 2,
       title: 'Telefon',
-      value: '+90 212 123 45 67',
+      value: '+90 537 447 71 32',
       icon: 'call',
       color: '#2ecc71',
     },
     {
       id: 3,
       title: 'Whatsapp',
-      value: '+90 555 123 45 67',
+      value: '+90 537 447 71 32',
       icon: 'logo-whatsapp',
       color: '#25D366',
-    },
-    {
-      id: 4,
-      title: 'Adres',
-      value: 'Fal Sokak, No:7, Taksim/İstanbul',
-      icon: 'location',
-      color: '#e74c3c',
     },
   ];
 

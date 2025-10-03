@@ -8,7 +8,8 @@ import {
   Platform,
   ScrollView,
   Alert,
-  ActivityIndicator
+  ActivityIndicator,
+  Image
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
@@ -20,7 +21,22 @@ const LoginScreen = ({ navigation }) => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   
-  const { login, loginWithGoogle, loading, error } = useAuth();
+  const { login, loading, error, loginWithGoogle } = useAuth();
+
+  const handleGoogleLogin = async () => {
+    try {
+      const success = await loginWithGoogle();
+      
+      if (!success && error) {
+        // Sadece gerçek hatalar için alert göster, iptal durumunda gösterme
+        if (error !== 'SIGN_IN_CANCELLED') {
+          Alert.alert('Giriş Hatası', error);
+        }
+      }
+    } catch (e) {
+      Alert.alert('Giriş Hatası', 'Google ile giriş yapılırken bir hata oluştu. Lütfen tekrar deneyin.');
+    }
+  };
 
   const handleLogin = async () => {
     // Basit doğrulama
@@ -53,13 +69,7 @@ const LoginScreen = ({ navigation }) => {
     }
   };
 
-  const handleGoogleLogin = async () => {
-    try {
-      await loginWithGoogle();
-    } catch (error) {
-      Alert.alert('Google ile Giriş Hatası', 'Google ile giriş yapılırken bir hata oluştu.');
-    }
-  };
+
 
   return (
     <KeyboardAvoidingView 
@@ -68,13 +78,18 @@ const LoginScreen = ({ navigation }) => {
     >
       <ScrollView contentContainerStyle={loginStyles.scrollContainer}>
         <View style={loginStyles.headerContainer}>
+          <Image 
+            source={require('../../assets/görseller/yeni-logo.png')} 
+            style={loginStyles.logo}
+            resizeMode="contain"
+          />
           <Text style={loginStyles.welcomeText}>Hoş Geldiniz</Text>
           <Text style={loginStyles.subtitle}>Hesabınıza giriş yapın</Text>
         </View>
         
         <View style={loginStyles.formContainer}>
           <View style={loginStyles.inputContainer}>
-            <Ionicons name="mail-outline" size={22} color={colors.primary} style={loginStyles.inputIcon} />
+            <Ionicons name="mail-outline" size={22} color={colors.secondary} style={loginStyles.inputIcon} />
             <TextInput
               style={loginStyles.input}
               placeholder="E-posta"
@@ -87,7 +102,7 @@ const LoginScreen = ({ navigation }) => {
           </View>
           
           <View style={loginStyles.inputContainer}>
-            <Ionicons name="lock-closed-outline" size={22} color={colors.primary} style={loginStyles.inputIcon} />
+            <Ionicons name="lock-closed-outline" size={22} color={colors.secondary} style={loginStyles.inputIcon} />
             <TextInput
               style={loginStyles.input}
               placeholder="Şifre"
@@ -103,7 +118,7 @@ const LoginScreen = ({ navigation }) => {
               <Ionicons 
                 name={showPassword ? "eye-off-outline" : "eye-outline"} 
                 size={22} 
-                color={colors.primary}
+                color={colors.secondary}
               />
             </TouchableOpacity>
           </View>
@@ -130,20 +145,22 @@ const LoginScreen = ({ navigation }) => {
             )}
           </TouchableOpacity>
           
-          <View style={loginStyles.orContainer}>
-            <View style={loginStyles.divider} />
-            <Text style={loginStyles.orText}>VEYA</Text>
-            <View style={loginStyles.divider} />
+          <View style={loginStyles.separatorContainer}>
+            <View style={loginStyles.separatorLine} />
+            <Text style={loginStyles.separatorText}>Veya</Text>
+            <View style={loginStyles.separatorLine} />
           </View>
-          
+
           <TouchableOpacity 
-            style={loginStyles.googleButton}
+            style={[loginStyles.googleButton, loading && loginStyles.loginButtonDisabled]}
             onPress={handleGoogleLogin}
             disabled={loading}
           >
-            <Ionicons name="logo-google" size={24} color={colors.social.google} style={loginStyles.googleIcon} />
+            <Ionicons name="logo-google" size={24} color={colors.text.light} style={loginStyles.googleIcon} />
             <Text style={loginStyles.googleButtonText}>Google ile Giriş Yap</Text>
           </TouchableOpacity>
+          
+          
         </View>
         
         <View style={loginStyles.registerContainer}>

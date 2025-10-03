@@ -11,6 +11,7 @@ export const colors = {
     secondary: '#E0E0E0',   // İkincil metin rengi
     tertiary: '#AAAAAA',    // Üçüncül metin rengi
     light: '#FFFFFF',       // Açık metin rengi (parlayan beyaz)
+    dark: '#000000',        // Koyu metin rengi (siyah)
     accent: '#FFD700',      // Vurgu metin rengi (altın sarısı)
   },
   border: '#2A2A40',        // Kenarlık rengi
@@ -23,6 +24,8 @@ export const colors = {
     google: '#DB4437',      // Google rengi
     facebook: '#4267B2',    // Facebook rengi
     apple: '#000000',       // Apple rengi
+    instagram: '#E4405F',   // Instagram rengi
+    tiktok: '#000000',      // TikTok rengi
   }
 };
 

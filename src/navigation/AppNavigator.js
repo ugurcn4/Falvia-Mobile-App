@@ -17,6 +17,15 @@ import ExploreScreen from '../screens/ExploreScreen';
 import AdminPanelScreen from '../screens/AdminPanelScreen';
 import AddFortuneTellerScreen from '../screens/AddFortuneTellerScreen';
 import EditFortuneTellerScreen from '../screens/EditFortuneTellerScreen';
+import ChatsListScreen from '../screens/ChatsListScreen';
+import ChatScreen from '../screens/ChatScreen';
+import NewChatScreen from '../screens/NewChatScreen';
+import MessageRequestScreen from '../screens/MessageRequestScreen';
+import OnboardingScreen from '../screens/OnboardingScreen';
+import FortuneDetailScreen from '../screens/FortuneDetailScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
+import ReferralInviteScreen from '../screens/ReferralInviteScreen';
+import AstrologyAnalysisScreen from '../screens/AstrologyAnalysisScreen';
 
 // Colors
 import colors from '../styles/colors';
@@ -50,6 +59,32 @@ const HomeStack = () => (
       component={TokenStoreScreen} 
       options={{ title: 'Jeton Mağazası' }} 
     />
+    
+    <Stack.Screen 
+      name="FalScreen" 
+      component={FalScreen} 
+      options={{ title: 'Falınız' }} 
+    />
+    <Stack.Screen 
+      name="FortuneDetail" 
+      component={FortuneDetailScreen} 
+      options={{ title: 'Fal Detayları' }} 
+    />
+    <Stack.Screen 
+      name="NewFortune" 
+      component={NewFortuneScreen} 
+      options={{ title: 'Fal Baktır' }} 
+    />
+    <Stack.Screen 
+      name="AstrologyAnalysis" 
+      component={AstrologyAnalysisScreen} 
+      options={{ title: 'Astroloji Analizi' }} 
+    />
+    <Stack.Screen 
+      name="Notifications" 
+      component={NotificationsScreen} 
+      options={{ title: 'Bildirimler' }} 
+    />
   </Stack.Navigator>
 );
 
@@ -77,6 +112,16 @@ const FalStack = () => (
       name="NewFortune" 
       component={NewFortuneScreen} 
       options={{ title: 'Fal Baktır' }} 
+    />
+    <Stack.Screen 
+      name="FortuneDetail" 
+      component={FortuneDetailScreen} 
+      options={{ title: 'Fal Detayları' }} 
+    />
+    <Stack.Screen 
+      name="BuyTokens" 
+      component={TokenStoreScreen} 
+      options={{ title: 'Jeton Mağazası' }} 
     />
   </Stack.Navigator>
 );
@@ -145,6 +190,11 @@ const ProfileStack = () => (
       options={{ title: 'Fal Geçmişim' }} 
     />
     <Stack.Screen 
+      name="ReferralInvite" 
+      component={ReferralInviteScreen} 
+      options={{ title: 'Arkadaş Davet Et' }} 
+    />
+    <Stack.Screen 
       name="BuyTokens" 
       component={TokenStoreScreen} 
       options={{ title: 'Jeton Mağazası' }} 
@@ -155,7 +205,7 @@ const ProfileStack = () => (
       options={{ title: 'Admin Paneli' }} 
     />
     <Stack.Screen 
-      name="AddFortuneTeller" 
+      name="AddFortuneTellers" 
       component={AddFortuneTellerScreen} 
       options={{ title: 'Falcı Ekle' }} 
     />
@@ -163,6 +213,23 @@ const ProfileStack = () => (
       name="EditFortuneTeller" 
       component={EditFortuneTellerScreen} 
       options={{ title: 'Falcı Düzenle' }} 
+    />
+    <Stack.Screen 
+      name="FalScreen" 
+      component={FalScreen} 
+      options={{ title: 'Fal Baktır' }} 
+    />
+    <Stack.Screen 
+      name="Onboarding" 
+      component={OnboardingScreen} 
+      options={{ 
+        headerShown: false,
+      }} 
+    />
+    <Stack.Screen 
+      name="Notifications" 
+      component={NotificationsScreen} 
+      options={{ title: 'Bildirimler' }} 
     />
   </Stack.Navigator>
 );
@@ -186,6 +253,80 @@ const ExploreStack = () => (
       name="ExploreScreen" 
       component={ExploreScreen} 
       options={{ title: 'Keşfet' }} 
+    />
+    <Stack.Screen 
+      name="ChatsList" 
+      component={ChatsListScreen} 
+      options={{ 
+        title: 'Sohbetler',
+        headerShown: false,
+        headerStyle: {
+          backgroundColor: colors.primary,
+        },
+        headerTintColor: colors.text.light,
+        headerTitleStyle: {
+          fontWeight: '600',
+          fontSize: 18,
+        },
+      }} 
+    />
+    <Stack.Screen 
+      name="ChatScreen" 
+      component={ChatScreen} 
+      options={{ 
+        title: 'Sohbet',
+        headerShown: true,
+        headerStyle: {
+          backgroundColor: colors.primary,
+        },
+        headerTintColor: colors.text.light,
+        headerTitleStyle: {
+          fontWeight: '600',
+          fontSize: 18,
+        },
+      }} 
+    />
+    <Stack.Screen 
+      name="NewChat" 
+      component={NewChatScreen} 
+      options={{ 
+        title: 'Yeni Sohbet',
+        headerShown: true,
+        headerStyle: {
+          backgroundColor: colors.primary,
+        },
+        headerTintColor: colors.text.light,
+        headerTitleStyle: {
+          fontWeight: '600',
+          fontSize: 18,
+        },
+      }} 
+    />
+    <Stack.Screen 
+      name="MessageRequest" 
+      component={MessageRequestScreen} 
+      options={{ 
+        title: 'Mesaj İsteği',
+        headerShown: true,
+        headerStyle: {
+          backgroundColor: colors.primary,
+        },
+        headerTintColor: colors.text.light,
+        headerTitleStyle: {
+          fontWeight: '600',
+          fontSize: 18,
+        },
+      }} 
+    />
+    <Stack.Screen 
+      name="BuyTokens" 
+      component={TokenStoreScreen} 
+      options={{ title: 'Jeton Mağazası' }} 
+    />
+    <Stack.Screen 
+      name="FalScreen" 
+      component={FalScreen} 
+      options={{ title: 'Falınız' }} 
     />
   </Stack.Navigator>
 );
@@ -259,6 +400,9 @@ const AppNavigator = () => {
           tabBarIcon: ({ color, size, focused }) => (
             <View style={styles.iconContainer}>
               <Ionicons name={focused ? 'person' : 'person-outline'} size={24} color={color} />
+              <View style={styles.newBadge}>
+                <Text style={styles.newBadgeText}>yeni</Text>
+              </View>
             </View>
           ),
         }}
@@ -289,6 +433,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingTop: 0,
+    position: 'relative',
+  },
+  newBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -12,
+    backgroundColor: '#e74c3c',
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    minWidth: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  newBadgeText: {
+    color: colors.text.light,
+    fontSize: 8,
+    fontWeight: 'bold',
+    textTransform: 'lowercase',
   },
   indicator: {
     width: 5,

@@ -96,7 +96,7 @@ const AdminPanelScreen = ({ navigation }) => {
           <Text style={styles.tellerName}>{teller.name}</Text>
           <Text style={styles.tellerRank}>{teller.rank}</Text>
           <Text style={styles.tellerSpecialties}>
-            {teller.specialties?.join(', ') || 'Belirtilmemiş'}
+            {teller.specialties?.join(', ') || '-'}
           </Text>
         </View>
         <View style={styles.tellerStats}>

@@ -345,58 +345,6 @@ const AccountSettingsScreen = ({ navigation }) => {
           </View>
         </View>
         
-        {/* Uygulama Ayarları */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Uygulama Ayarları</Text>
-          
-          <View style={styles.card}>
-            {/* Koyu Mod */}
-            <View style={styles.settingRow}>
-              <View style={styles.settingInfo}>
-                <Ionicons name="moon" size={20} color={colors.text.primary} />
-                <Text style={styles.settingText}>Koyu Mod</Text>
-              </View>
-              <Switch
-                trackColor={{ false: colors.border, true: colors.primaryLight }}
-                thumbColor={settings.darkMode ? colors.secondary : '#f4f3f4'}
-                ios_backgroundColor={colors.border}
-                onValueChange={(value) => updateSetting('darkMode', value)}
-                value={settings.darkMode}
-              />
-            </View>
-            
-            {/* Gizli Profil */}
-            <View style={styles.settingRow}>
-              <View style={styles.settingInfo}>
-                <MaterialIcons name="visibility-off" size={20} color={colors.text.primary} />
-                <Text style={styles.settingText}>Gizli Profil</Text>
-              </View>
-              <Switch
-                trackColor={{ false: colors.border, true: colors.primaryLight }}
-                thumbColor={settings.privateProfile ? colors.secondary : '#f4f3f4'}
-                ios_backgroundColor={colors.border}
-                onValueChange={(value) => updateSetting('privateProfile', value)}
-                value={settings.privateProfile}
-              />
-            </View>
-            
-            {/* İki Faktörlü Doğrulama */}
-            <View style={styles.settingRow}>
-              <View style={styles.settingInfo}>
-                <MaterialIcons name="security" size={20} color={colors.text.primary} />
-                <Text style={styles.settingText}>İki Faktörlü Doğrulama</Text>
-              </View>
-              <Switch
-                trackColor={{ false: colors.border, true: colors.primaryLight }}
-                thumbColor={settings.twoFactorAuth ? colors.secondary : '#f4f3f4'}
-                ios_backgroundColor={colors.border}
-                onValueChange={(value) => updateSetting('twoFactorAuth', value)}
-                value={settings.twoFactorAuth}
-              />
-            </View>
-          </View>
-        </View>
-        
         {/* Hesap Silme */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Tehlikeli Bölge</Text>

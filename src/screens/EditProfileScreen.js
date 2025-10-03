@@ -27,6 +27,7 @@ const EditProfileScreen = ({ navigation }) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [userData, setUserData] = useState(null);
   const [profileImage, setProfileImage] = useState(null);
   const [fullName, setFullName] = useState('');
@@ -122,12 +123,29 @@ const EditProfileScreen = ({ navigation }) => {
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
+        allowsMultipleSelection: false,
       });
       
-      if (!result.canceled) {
-        setProfileImage(result.assets[0].uri);
+      if (!result.canceled && result.assets[0]) {
+        const selectedImage = result.assets[0];
+        
+        // Dosya boyutu kontrolü (5MB limit)
+        if (selectedImage.fileSize && selectedImage.fileSize > 5 * 1024 * 1024) {
+          Alert.alert('Dosya Boyutu Hatası', 'Seçilen fotoğraf 5MB\'dan büyük. Lütfen daha küçük bir fotoğraf seçin.');
+          return;
+        }
+        
+        // Dosya formatı kontrolü
+        const fileExtension = selectedImage.uri.split('.').pop().toLowerCase();
+        if (!['jpg', 'jpeg', 'png'].includes(fileExtension)) {
+          Alert.alert('Dosya Formatı Hatası', 'Sadece JPG ve PNG formatında fotoğraflar desteklenir.');
+          return;
+        }
+        
+        setProfileImage(selectedImage.uri);
       }
     } catch (error) {
+      console.error('Fotoğraf seçme hatası:', error);
       Alert.alert('Hata', 'Fotoğraf seçilirken bir hata oluştu.');
     }
   };
@@ -148,6 +166,65 @@ const EditProfileScreen = ({ navigation }) => {
 
 
 
+  // Profil fotoğrafı yükleme fonksiyonu
+  const uploadProfileImage = async (uri) => {
+    try {
+      // Eğer zaten bir URL ise (http ile başlıyorsa) direkt döndür
+      if (uri && uri.startsWith('http')) {
+        return uri;
+      }
+      
+      // Eğer profil fotoğrafı seçilmediyse mevcut fotoğrafı koru
+      if (!uri) {
+        return userData?.profile_image || null;
+      }
+      
+      
+      // Dosya adını oluştur (kullanıcı ID'si ile klasörleme)
+      const fileExt = uri.split('.').pop().toLowerCase();
+      const timestamp = Date.now();
+      const fileName = `${user.id}/${timestamp}.${fileExt}`;
+      
+      // React Native'den dosyayı oku
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      
+      // ArrayBuffer'a çevir
+      const arrayBuffer = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsArrayBuffer(blob);
+      });
+      
+      
+      // Supabase Storage'a yükle (profile-images bucket)
+      const { data, error } = await supabase.storage
+        .from('profile-images')
+        .upload(fileName, arrayBuffer, {
+          contentType: `image/${fileExt}`,
+          upsert: false
+        });
+      
+      if (error) {
+        console.error('❌ Profil fotoğrafı upload hatası:', error);
+        throw error;
+      }
+      
+      
+      // Public URL al
+      const { data: publicUrlData } = supabase.storage
+        .from('profile-images')
+        .getPublicUrl(fileName);
+      
+      
+      return publicUrlData.publicUrl;
+    } catch (error) {
+      console.error('❌ Profil fotoğrafı upload hatası:', error);
+      throw new Error('Profil fotoğrafı yüklenirken bir hata oluştu: ' + error.message);
+    }
+  };
+
   // Profil güncelleme
   const handleUpdateProfile = async () => {
     try {
@@ -165,13 +242,32 @@ const EditProfileScreen = ({ navigation }) => {
         return;
       }
       
-      // Profil fotoğrafı yükleme (gerçek uygulamada Supabase Storage'a yükleme yapılmalı)
-      // Bu örnek için sadece URL'i kaydediyoruz
+      // Profil fotoğrafını Supabase Storage'a yükle
+      let profileImageUrl = userData?.profile_image || null;
+      if (profileImage && profileImage !== userData?.profile_image) {
+        try {
+          setUploadingImage(true);
+          profileImageUrl = await uploadProfileImage(profileImage);
+        } catch (uploadError) {
+          console.error('Profil fotoğrafı yükleme hatası:', uploadError);
+          Alert.alert(
+            'Fotoğraf Yükleme Hatası', 
+            uploadError.message || 'Profil fotoğrafı yüklenirken bir hata oluştu. Diğer bilgiler güncellendi.',
+            [
+              { text: 'Devam Et', onPress: () => {} },
+              { text: 'İptal', style: 'cancel', onPress: () => setSaving(false) }
+            ]
+          );
+          return; // Hata durumunda işlemi durdur
+        } finally {
+          setUploadingImage(false);
+        }
+      }
       
       // Güncellenecek kullanıcı verileri
       const updatedUserData = {
         full_name: fullName,
-        profile_image: profileImage,
+        profile_image: profileImageUrl,
         zodiac_sign: zodiacSign,
         rising_sign: risingSign,
         gender: gender,
@@ -284,15 +380,26 @@ const EditProfileScreen = ({ navigation }) => {
         {/* Profil Fotoğrafı */}
         <View style={styles.profileImageContainer}>
           <View style={styles.profileImageWrapper}>
-            <Image
-              source={{ uri: profileImage || 'https://randomuser.me/api/portraits/men/32.jpg' }}
-              style={styles.profileImage}
-            />
+            {profileImage ? (
+              <Image
+                source={{ uri: profileImage }}
+                style={styles.profileImage}
+              />
+            ) : (
+              <View style={[styles.profileImage, styles.defaultProfileImage]}>
+                <Ionicons name="person" size={50} color={colors.text.light} />
+              </View>
+            )}
             <TouchableOpacity
               style={styles.cameraButton}
               onPress={pickImage}
+              disabled={uploadingImage}
             >
-              <Ionicons name="camera" size={16} color={colors.text.light} />
+              {uploadingImage ? (
+                <ActivityIndicator size="small" color={colors.text.light} />
+              ) : (
+                <Ionicons name="camera" size={16} color={colors.text.light} />
+              )}
             </TouchableOpacity>
           </View>
           <Text style={styles.changePhotoText}>Fotoğrafı Değiştir</Text>
@@ -391,9 +498,9 @@ const EditProfileScreen = ({ navigation }) => {
         <TouchableOpacity
           style={styles.saveButton}
           onPress={handleUpdateProfile}
-          disabled={saving}
+          disabled={saving || uploadingImage}
         >
-          {saving ? (
+          {(saving || uploadingImage) ? (
             <ActivityIndicator size="small" color={colors.text.light} />
           ) : (
             <Text style={styles.saveButtonText}>Değişiklikleri Kaydet</Text>
@@ -468,6 +575,11 @@ const styles = StyleSheet.create({
     borderRadius: 50,
     borderWidth: 2,
     borderColor: colors.secondary,
+  },
+  defaultProfileImage: {
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   cameraButton: {
     position: 'absolute',

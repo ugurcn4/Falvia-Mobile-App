@@ -14,7 +14,6 @@ export const handleJWTExpired = async (operation, navigation = null) => {
     
     // JWT expired hatası varsa token yenileme dene
     if (result.error && result.error.code === 'PGRST301') {
-      console.log('JWT expired, token yenileniyor...');
       
       const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
       

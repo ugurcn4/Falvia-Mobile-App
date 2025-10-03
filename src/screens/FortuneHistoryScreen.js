@@ -9,7 +9,8 @@ import {
   Image,
   ActivityIndicator,
   RefreshControl,
-  FlatList
+  FlatList,
+  Alert
 } from 'react-native';
 import { Ionicons, MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -19,6 +20,7 @@ import colors from '../styles/colors';
 import { spacing, radius } from '../styles/spacing';
 import { typography } from '../styles/typography';
 import shadows from '../styles/shadows';
+import adMobService from '../services/adMobService';
 
 const FortuneHistoryScreen = ({ navigation }) => {
   const { user } = useAuth();
@@ -47,7 +49,7 @@ const FortuneHistoryScreen = ({ navigation }) => {
           *,
           fortune_tellers:fortune_teller_id (
             id,
-            full_name,
+            name,
             profile_image,
             rating,
             experience_years
@@ -149,6 +151,131 @@ const FortuneHistoryScreen = ({ navigation }) => {
     navigation.navigate('FortuneDetail', { fortuneId: fortune.id });
   };
 
+  // Reklam izle ve falı hemen gör
+  const watchAdForImmediateFortune = async (fortune) => {
+    try {
+      // Fal için izlenen reklam sayısını kontrol et
+      const watchedAdsKey = `@fortune_ads_${fortune.id}`;
+      const watchedAds = await AsyncStorage.getItem(watchedAdsKey);
+      const currentWatchedAds = watchedAds ? parseInt(watchedAds, 10) : 0;
+      
+      if (currentWatchedAds >= 2) {
+        // 2 reklam zaten izlendi, hızlandırma yapıldı
+        Alert.alert(
+          '🚀 Zaten Hızlandırıldı!',
+          'Bu fal için reklam izleme hızlandırması zaten yapıldı. Falınız sırada öncelikli olarak işleniyor.',
+          [{ text: 'Tamam' }]
+        );
+        return;
+      }
+      
+      // Reklam izleme işlemi (fal hızlandırma için - günlük limit uygulanmaz)
+      const adWatched = await adMobService.showRewardedAd(false);
+      
+      if (adWatched) {
+        // İzlenen reklam sayısını artır
+        const newWatchedAds = currentWatchedAds + 1;
+        await AsyncStorage.setItem(watchedAdsKey, newWatchedAds.toString());
+        
+        if (newWatchedAds >= 2) {
+          // 2 reklam tamamlandı, falı sırada öne geçir
+          await prioritizeFortuneInQueue(fortune.id);
+        } else {
+          // Daha fazla reklam izleme gerekiyor
+          Alert.alert(
+            'Reklam İzlendi!',
+            `1/2 reklam tamamlandı. Falınızı görmek için 1 reklam daha izleyin.`,
+            [{ text: 'Tamam' }]
+          );
+          // Falları yeniden yükle
+          fetchFortunes();
+        }
+      }
+    } catch (error) {
+      console.error('Reklam izleme hatası:', error);
+      Alert.alert('Hata', 'Reklam izlenirken bir hata oluştu.');
+    }
+  };
+
+  // Falı sırada öne geçir
+  const prioritizeFortuneInQueue = async (fortuneId) => {
+    try {
+      // Fal bilgilerini al
+      const { data: fortune, error: fortuneError } = await supabase
+        .from('fortunes')
+        .select('process_after, created_at')
+        .eq('id', fortuneId)
+        .single();
+
+      if (fortuneError) {
+        console.error('Fal bilgisi alınamadı:', fortuneError);
+        Alert.alert('Hata', 'Fal bilgisi alınamadı.');
+        return;
+      }
+
+      // Hızlandırılmış süreyi hesapla
+      const originalProcessTime = new Date(fortune.process_after);
+      const currentTime = new Date();
+      const remainingMinutes = Math.ceil((originalProcessTime - currentTime) / (1000 * 60));
+      
+      let newProcessTime;
+      let message;
+      
+      if (remainingMinutes <= 10) {
+        // 10 dakikadan az kaldıysa 2 dakika içinde göster
+        newProcessTime = new Date(currentTime.getTime() + 2 * 60 * 1000);
+        message = 'Falınız 2 dakika içinde gösterilecek!';
+      } else {
+        // 10-20 dakika arası random süre
+        const randomMinutes = Math.floor(Math.random() * 11) + 10; // 10-20 dakika
+        newProcessTime = new Date(currentTime.getTime() + randomMinutes * 60 * 1000);
+        message = `Falınız ${randomMinutes} dakika içinde gösterilecek!`;
+      }
+
+      // Fal süresini güncelle
+      const { error: updateError } = await supabase
+        .from('fortunes')
+        .update({ 
+          process_after: newProcessTime.toISOString()
+        })
+        .eq('id', fortuneId);
+
+      if (updateError) {
+        console.error('Fal süresi güncellenemedi:', updateError);
+        Alert.alert('Hata', 'Fal süresi güncellenemedi.');
+        return;
+      }
+
+      // Fal için izlenen reklam sayısını 2/2 olarak sabitle (tekrar izlemeye kapalı)
+      const watchedAdsKey = `@fortune_ads_${fortuneId}`;
+      await AsyncStorage.setItem(watchedAdsKey, '2');
+
+      // Falları yeniden yükle
+      fetchFortunes();
+      
+      Alert.alert(
+        '🚀 Fal Hızlandırıldı!',
+        message,
+        [{ text: 'Harika!' }]
+      );
+    } catch (error) {
+      console.error('Fal öncelik güncelleme hatası:', error);
+      Alert.alert('Hata', 'Fal önceliği güncellenirken bir hata oluştu.');
+    }
+  };
+
+  // Fal için izlenen reklam sayısını getir
+  const getFortuneAdProgress = async (fortuneId) => {
+    try {
+      const watchedAdsKey = `@fortune_ads_${fortuneId}`;
+      const watchedAds = await AsyncStorage.getItem(watchedAdsKey);
+      return watchedAds ? parseInt(watchedAds, 10) : 0;
+    } catch (error) {
+      console.error('Reklam ilerleme durumu alınamadı:', error);
+      return 0;
+    }
+  };
+
   // Fal kartı render
   const renderFortuneCard = ({ item }) => {
     const statusInfo = getStatusInfo(item.status);
@@ -201,7 +328,7 @@ const FortuneHistoryScreen = ({ navigation }) => {
             />
             <View style={styles.fortuneTellerInfo}>
               <Text style={styles.fortuneTellerName}>
-                {item.fortune_tellers?.full_name || 'İsimsiz Falcı'}
+                {item.fortune_tellers?.name || 'İsimsiz Falcı'}
               </Text>
               <View style={styles.ratingContainer}>
                 <Ionicons name="star" size={12} color={colors.secondary} />
@@ -232,15 +359,50 @@ const FortuneHistoryScreen = ({ navigation }) => {
           )}
           
           {(item.status === 'pending' || item.status === 'in_progress') && (
-            <TouchableOpacity 
-              style={[styles.footerButton, { flex: 1, justifyContent: 'center' }]}
-              onPress={() => {
-                // İptal etme işlemi
-              }}
-            >
-              <Ionicons name="close-circle-outline" size={18} color={colors.error} />
-              <Text style={[styles.footerButtonText, { color: colors.error }]}>İptal Et</Text>
-            </TouchableOpacity>
+            <>
+                            <TouchableOpacity 
+                style={[
+                  styles.footerButton, 
+                  { flex: 1, justifyContent: 'center' },
+                  getFortuneAdProgress(item.id) >= 2 && styles.footerButtonDisabled
+                ]}
+                onPress={() => getFortuneAdProgress(item.id) >= 2 ? null : watchAdForImmediateFortune(item)}
+                disabled={getFortuneAdProgress(item.id) >= 2}
+              >
+                <Ionicons 
+                  name={getFortuneAdProgress(item.id) >= 2 ? "checkmark-circle-outline" : "play-circle-outline"} 
+                  size={18} 
+                  color={getFortuneAdProgress(item.id) >= 2 ? colors.success : colors.primary} 
+                />
+                <View style={styles.footerButtonContent}>
+                  <Text style={[styles.footerButtonText, { 
+                    color: getFortuneAdProgress(item.id) >= 2 ? colors.success : colors.primary 
+                  }]}>
+                    {getFortuneAdProgress(item.id) >= 2 
+                      ? "🚀 Zaten Hızlandırıldı!" 
+                      : "Reklam İzle ve Daha Kısa Sürede Gör!"
+                    }
+                  </Text>
+                  <Text style={[styles.footerButtonProgressText, { 
+                    color: getFortuneAdProgress(item.id) >= 2 ? colors.success : colors.primary 
+                  }]}>
+                    {getFortuneAdProgress(item.id)}/2
+                  </Text>
+                </View>
+              </TouchableOpacity>
+              
+              <View style={styles.footerDivider} />
+              
+              <TouchableOpacity 
+                style={[styles.footerButton, { flex: 1, justifyContent: 'center' }]}
+                onPress={() => {
+                  // İptal etme işlemi
+                }}
+              >
+                <Ionicons name="close-circle-outline" size={18} color={colors.error} />
+                <Text style={[styles.footerButtonText, { color: colors.error }]}>İptal Et</Text>
+              </TouchableOpacity>
+            </>
           )}
         </View>
       </TouchableOpacity>
@@ -503,10 +665,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: spacing.md,
   },
+  footerButtonDisabled: {
+    opacity: 0.6,
+  },
   footerButtonText: {
     fontSize: typography.fontSize.sm,
     color: colors.text.primary,
     marginLeft: spacing.xs,
+    marginBottom: 2,
+  },
+  footerButtonContent: {
+    alignItems: 'center',
+  },
+  footerButtonProgressText: {
+    fontSize: typography.fontSize.xs,
+    color: colors.text.primary,
+    opacity: 0.8,
   },
   footerDivider: {
     width: 1,

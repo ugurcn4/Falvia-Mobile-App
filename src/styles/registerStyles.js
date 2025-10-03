@@ -19,6 +19,13 @@ export const registerStyles = StyleSheet.create({
     marginTop: spacing.xxxl + spacing.sm,
     marginBottom: spacing.xl,
   },
+  logo: {
+    width: 120,
+    height: 120,
+    marginBottom: spacing.lg,
+    borderRadius: 60,
+    ...shadows.md,
+  },
   appName: {
     fontSize: typography.fontSize.title,
     fontWeight: typography.fontWeight.bold,
@@ -52,7 +59,7 @@ export const registerStyles = StyleSheet.create({
   },
   inputIcon: {
     marginRight: spacing.sm,
-    color: colors.primary,
+    color: colors.secondary,
   },
   input: {
     flex: 1,
@@ -73,7 +80,7 @@ export const registerStyles = StyleSheet.create({
     lineHeight: typography.lineHeight.md,
   },
   termsLink: {
-    color: colors.primary,
+    color: colors.secondary,
     fontWeight: typography.fontWeight.semiBold,
   },
   registerButton: {
@@ -146,7 +153,7 @@ export const registerStyles = StyleSheet.create({
     fontSize: typography.fontSize.md,
   },
   loginLink: {
-    color: colors.primary,
+    color: colors.secondary,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.bold,
     marginLeft: spacing.xs,

@@ -8,7 +8,8 @@ import {
   Platform,
   ScrollView,
   Alert,
-  ActivityIndicator
+  ActivityIndicator,
+  Image
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
@@ -42,27 +43,31 @@ const RegisterScreen = ({ navigation }) => {
       return;
     }
     
-    
     // Kayıt işlemini gerçekleştir
-    const { data, error: signUpError } = await register(name, email, password);
+    const { data, error: signUpError } = await register(name, email, password, null);
     
     
     // Hata varsa göster
     if (signUpError) {
-      let errorMessage = 'Kayıt olurken bir hata oluştu';
+      console.error('RegisterScreen: Kayıt hatası:', signUpError);
       
+      let errorMessage = 'Kayıt olurken bir hata oluştu';
       
       // Supabase hata mesajlarını Türkçeleştir
       if (signUpError.message && signUpError.message.includes('already registered')) {
         errorMessage = 'Bu e-posta adresi zaten kayıtlı';
       } else if (signUpError.message && signUpError.message.includes('valid email')) {
         errorMessage = 'Geçerli bir e-posta adresi girin';
+      } else if (signUpError.message) {
+        errorMessage = signUpError.message;
       }
-      
       Alert.alert('Kayıt Hatası', errorMessage);
     } else {
-      // Başarılı kayıt sonrası doğrulama ekranına yönlendir
-      navigation.navigate('VerifyEmail', { email, password });
+      // Eğer kullanıcı otomatik olarak giriş yaptıysa (email doğrulama kapalıysa)
+      if (data?.user?.email_confirmed_at) {
+      } else {
+        navigation.navigate('VerifyEmail', { email, password });
+      }
     }
   };
 
@@ -81,13 +86,18 @@ const RegisterScreen = ({ navigation }) => {
     >
       <ScrollView contentContainerStyle={registerStyles.scrollContainer}>
         <View style={registerStyles.headerContainer}>
+          <Image 
+            source={require('../../assets/görseller/yeni-logo.png')} 
+            style={registerStyles.logo}
+            resizeMode="contain"
+          />
           <Text style={registerStyles.welcomeText}>Hesap Oluştur</Text>
           <Text style={registerStyles.subtitle}>Falınıza hemen başlamak için kayıt olun</Text>
         </View>
         
         <View style={registerStyles.formContainer}>
           <View style={registerStyles.inputContainer}>
-            <Ionicons name="person-outline" size={22} color={colors.primary} style={registerStyles.inputIcon} />
+            <Ionicons name="person-outline" size={22} color={colors.secondary} style={registerStyles.inputIcon} />
             <TextInput
               style={registerStyles.input}
               placeholder="Ad Soyad"
@@ -98,7 +108,7 @@ const RegisterScreen = ({ navigation }) => {
           </View>
           
           <View style={registerStyles.inputContainer}>
-            <Ionicons name="mail-outline" size={22} color={colors.primary} style={registerStyles.inputIcon} />
+            <Ionicons name="mail-outline" size={22} color={colors.secondary} style={registerStyles.inputIcon} />
             <TextInput
               style={registerStyles.input}
               placeholder="E-posta"
@@ -111,7 +121,7 @@ const RegisterScreen = ({ navigation }) => {
           </View>
           
           <View style={registerStyles.inputContainer}>
-            <Ionicons name="lock-closed-outline" size={22} color={colors.primary} style={registerStyles.inputIcon} />
+            <Ionicons name="lock-closed-outline" size={22} color={colors.secondary} style={registerStyles.inputIcon} />
             <TextInput
               style={registerStyles.input}
               placeholder="Şifre"
@@ -127,13 +137,13 @@ const RegisterScreen = ({ navigation }) => {
               <Ionicons 
                 name={showPassword ? "eye-off-outline" : "eye-outline"} 
                 size={22} 
-                color={colors.primary}
+                color={colors.secondary}
               />
             </TouchableOpacity>
           </View>
           
           <View style={registerStyles.inputContainer}>
-            <Ionicons name="lock-closed-outline" size={22} color={colors.primary} style={registerStyles.inputIcon} />
+            <Ionicons name="lock-closed-outline" size={22} color={colors.secondary} style={registerStyles.inputIcon} />
             <TextInput
               style={registerStyles.input}
               placeholder="Şifre Tekrar"
@@ -149,7 +159,7 @@ const RegisterScreen = ({ navigation }) => {
               <Ionicons 
                 name={showConfirmPassword ? "eye-off-outline" : "eye-outline"} 
                 size={22} 
-                color={colors.primary}
+                color={colors.secondary}
               />
             </TouchableOpacity>
           </View>
@@ -176,29 +186,14 @@ const RegisterScreen = ({ navigation }) => {
             )}
           </TouchableOpacity>
           
-          <View style={registerStyles.orContainer}>
-            <View style={registerStyles.divider} />
-            <Text style={registerStyles.orText}>VEYA</Text>
-            <View style={registerStyles.divider} />
+          <View style={registerStyles.loginContainer}>
+            <Text style={registerStyles.loginText}>Zaten hesabınız var mı?</Text>
+            <TouchableOpacity 
+              onPress={() => navigation.navigate('Login')}
+            >
+              <Text style={registerStyles.loginLink}>Giriş Yap</Text>
+            </TouchableOpacity>
           </View>
-          
-          <TouchableOpacity 
-            style={registerStyles.googleButton}
-            onPress={handleGoogleRegister}
-            disabled={loading}
-          >
-            <Ionicons name="logo-google" size={24} color={colors.social.google} style={registerStyles.googleIcon} />
-            <Text style={registerStyles.googleButtonText}>Google ile Kayıt Ol</Text>
-          </TouchableOpacity>
-        </View>
-        
-        <View style={registerStyles.loginContainer}>
-          <Text style={registerStyles.loginText}>Zaten hesabınız var mı?</Text>
-          <TouchableOpacity 
-            onPress={() => navigation.navigate('Login')}
-          >
-            <Text style={registerStyles.loginLink}>Giriş Yap</Text>
-          </TouchableOpacity>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>

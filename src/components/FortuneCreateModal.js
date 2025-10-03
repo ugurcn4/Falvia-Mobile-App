@@ -10,7 +10,9 @@ import {
   TouchableWithoutFeedback,
   ScrollView,
   KeyboardAvoidingView,
-  Platform
+  Platform,
+  Alert,
+  ActivityIndicator
 } from 'react-native';
 import { Ionicons, MaterialIcons, Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -19,11 +21,16 @@ import colors from '../styles/colors';
 import { spacing, radius } from '../styles/spacing';
 import { typography } from '../styles/typography';
 import shadows from '../styles/shadows';
+import { uploadPostImage } from '../services/supabaseService';
+import { useAuth } from '../context/AuthContext';
 
 const FortuneCreateModal = ({ visible, onClose, onPublish }) => {
+  const { user } = useAuth();
+  
   const [description, setDescription] = useState('');
   const [image, setImage] = useState(null);
   const [fortuneType, setFortuneType] = useState('coffee'); // coffee, tarot, palm
+  const [uploading, setUploading] = useState(false);
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -42,21 +49,46 @@ const FortuneCreateModal = ({ visible, onClose, onPublish }) => {
     setFortuneType(type);
   };
 
-  const handlePublish = () => {
+  const handlePublish = async () => {
     if (!image || !description.trim()) {
-      // Burada kullanıcıya bir uyarı gösterilebilir
+      Alert.alert('Eksik Bilgi', 'Lütfen resim ve açıklama ekleyin.');
       return;
     }
 
-    const newPost = {
-      description,
-      imageUrl: image,
-      fortuneType,
-    };
+    if (!user) {
+      Alert.alert('Hata', 'Giriş yapmalısınız.');
+      return;
+    }
 
-    onPublish(newPost);
-    resetForm();
-    onClose();
+    setUploading(true);
+
+    try {
+      
+      // Resmi Supabase Storage'a yükle
+      const uploadResult = await uploadPostImage(image, user.id);
+      
+      if (!uploadResult.success) {
+        throw new Error(uploadResult.error || 'Upload başarısız');
+      }
+
+
+      const newPost = {
+        description,
+        imageUrl: uploadResult.url, // Storage URL'i kullan
+        imagePath: uploadResult.path, // Silme işlemi için path'i sakla
+        fortuneType,
+      };
+
+      onPublish(newPost);
+      resetForm();
+      onClose();
+      
+    } catch (error) {
+      console.error('❌ Publish hatası:', error);
+      Alert.alert('Hata', 'Paylaşım yapılırken bir hata oluştu: ' + error.message);
+    } finally {
+      setUploading(false);
+    }
   };
 
   const resetForm = () => {
@@ -214,12 +246,21 @@ const FortuneCreateModal = ({ visible, onClose, onPublish }) => {
                   <TouchableOpacity 
                     style={[
                       styles.publishButton, 
-                      (!image || !description.trim()) && styles.publishButtonDisabled
+                      ((!image || !description.trim()) || uploading) && styles.publishButtonDisabled
                     ]} 
                     onPress={handlePublish}
-                    disabled={!image || !description.trim()}
+                    disabled={(!image || !description.trim()) || uploading}
                   >
-                    <Text style={styles.publishButtonText}>Paylaş</Text>
+                    {uploading ? (
+                      <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="small" color={colors.text.light} />
+                        <Text style={[styles.publishButtonText, { marginLeft: spacing.sm }]}>
+                          Yükleniyor...
+                        </Text>
+                      </View>
+                    ) : (
+                      <Text style={styles.publishButtonText}>Paylaş</Text>
+                    )}
                   </TouchableOpacity>
                 </View>
               </LinearGradient>
@@ -389,6 +430,10 @@ const styles = StyleSheet.create({
   publishButtonDisabled: {
     backgroundColor: 'rgba(255, 215, 0, 0.5)',
     ...shadows.sm,
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   publishButtonText: {
     color: colors.background,

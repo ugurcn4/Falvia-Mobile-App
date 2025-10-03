@@ -1,5 +1,6 @@
 import { createContext, useState, useContext, useEffect } from 'react';
-import { supabase, signIn, signUp, signOut, getCurrentUser, signInWithGoogle } from '../../lib/supabase';
+import { supabase, signIn, signUp, signOut, getCurrentUser } from '../../lib/supabase';
+import { signInWithGoogle as googleSignIn, configureGoogleSignIn, checkGoogleSignInConfig } from '../services/googleAuthService';
 
 // Context oluşturma
 const AuthContext = createContext();
@@ -13,6 +14,17 @@ export const AuthProvider = ({ children }) => {
 
   // Uygulama başladığında oturum durumunu kontrol et
   useEffect(() => {
+    // Google Sign-In konfigürasyonu
+    configureGoogleSignIn();
+    
+    // Debug için Google config durumunu kontrol et (async olarak)
+    setTimeout(async () => {
+      try {
+        await checkGoogleSignInConfig();
+      } catch (error) {
+      }
+    }, 1000);
+    
     checkUserSession();
     
     // Supabase auth değişikliklerini dinle
@@ -40,13 +52,16 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       const { user: currentUser, error: userError } = await getCurrentUser();
       
-      if (userError) throw userError;
+      // AuthSessionMissingError normal bir durumdur (kullanıcı giriş yapmamış)
+      if (userError && userError.message !== 'Auth session missing!') {
+        console.error('Auth session check error:', userError);
+        setError(userError.message);
+      }
       
       if (currentUser) {
         setUser(currentUser);
       }
     } catch (e) {
-      setError(e.message);
     } finally {
       setLoading(false);
       setInitializing(false);
@@ -96,16 +111,33 @@ export const AuthProvider = ({ children }) => {
     setError(null);
     
     try {
-      const { data, error: googleError } = await signInWithGoogle();
+      const { data, userInfo } = await googleSignIn();
       
-      if (googleError) throw googleError;
-      
-      // Google ile giriş başarılı, ancak yönlendirme gerçekleşeceği için
-      // burada kullanıcı bilgilerini ayarlamıyoruz.
-      // Oturum değişikliği dinleyicisi bunu otomatik olarak yapacaktır.
-      
-      return true;
+      if (data?.user) {
+        setUser(data.user);
+        return true;
+      } else {
+        setError('Google ile giriş yapılırken bir hata oluştu');
+        return false;
+      }
     } catch (e) {
+      
+      // Spesifik hata durumlarını handle et
+      if (e.message === 'SIGN_IN_CANCELLED') {
+        return false;
+      }
+      
+      if (e.message === 'SIGN_IN_IN_PROGRESS') {
+        setError('Google giriş işlemi devam ediyor. Lütfen bekleyin.');
+        return false;
+      }
+      
+      if (e.message === 'PLAY_SERVICES_NOT_AVAILABLE') {
+        setError('Google Play Services mevcut değil. Lütfen güncelleyin.');
+        return false;
+      }
+      
+      // Diğer hatalar için genel mesaj
       setError(e.message || 'Google ile giriş yapılırken bir hata oluştu');
       return false;
     } finally {
@@ -114,7 +146,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Kayıt işlemi
-  const register = async (name, email, password) => {
+  const register = async (name, email, password, birthDate = null) => {
     setLoading(true);
     setError(null);
     
@@ -125,10 +157,6 @@ export const AuthProvider = ({ children }) => {
       const firstName = nameParts[0] || '';
       const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
       
-      // Şu anki tarih
-      const birthDate = new Date().toISOString().split('T')[0]; // Varsayılan değer
-      
-      
       const { data, error: signUpError } = await signUp(
         email, 
         password, 
@@ -138,13 +166,23 @@ export const AuthProvider = ({ children }) => {
       );
       
       if (signUpError) {
+        console.error('SignUp hatası:', signUpError);
         setError(signUpError.message || 'Kayıt olurken bir hata oluştu');
         return { data: null, error: signUpError };
       }
       
+      // Eğer kullanıcı otomatik olarak giriş yaptıysa, kullanıcı durumunu güncelle
+      if (data?.user) {
+        const { user: currentUser, error: userError } = await getCurrentUser();
+        
+        if (!userError && currentUser) {
+          setUser(currentUser);
+        }
+      }
+      
       return { data, error: null };
     } catch (e) {
-      error("Register hatası:", e);
+      console.error("Register hatası:", e);
       setError(e.message || 'Kayıt olurken bir hata oluştu');
       return { data: null, error: e };
     } finally {
