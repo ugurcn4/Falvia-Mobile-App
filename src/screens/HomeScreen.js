@@ -737,20 +737,52 @@ const HomeScreen = ({ navigation }) => {
 
 
 
-                  {/* Premium Üyelik Butonu */}
+                  {/* Falcı ile Canlı Sohbet Et Butonu */}
           <TouchableOpacity 
-            style={styles.premiumButton}
-            onPress={() => navigation.navigate('BuyTokens')}
+            style={styles.fortuneTellerChatButton}
+            onPress={() => navigation.navigate('FortuneTellerList')}
           >
             <LinearGradient
-              colors={[colors.social.google, colors.primary]}
-              style={styles.premiumGradient}
+              colors={['#8E2DE2', '#4A00E0']}
+              style={styles.fortuneTellerChatGradient}
               start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
+              end={{ x: 1, y: 1 }}
             >
-              <Text style={styles.premiumEmoji}>👑</Text>
-              <Text style={styles.premiumText}>Premium Üye Ol</Text>
-              <Ionicons name="arrow-forward" size={20} color={colors.text.light} />
+              <View style={styles.fortuneTellerChatContent}>
+                <View style={styles.fortuneTellerChatLeft}>
+                  <View style={styles.fortuneTellerChatIconContainer}>
+                    <MaterialCommunityIcons 
+                      name="crystal-ball" 
+                      size={32} 
+                      color={colors.secondary} 
+                    />
+                    <View style={styles.onlinePulse} />
+                  </View>
+                  <View style={styles.fortuneTellerChatTextContainer}>
+                    <Text style={styles.fortuneTellerChatTitle}>
+                      Falcı ile Canlı Sohbet Et
+                    </Text>
+                    <Text style={styles.fortuneTellerChatSubtitle}>
+                      Deneyimli falcılarımızla anında bağlan
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.fortuneTellerChatRight}>
+                  <Ionicons name="arrow-forward-circle" size={32} color={colors.secondary} />
+                </View>
+              </View>
+              
+              {/* Alt bilgi */}
+              <View style={styles.fortuneTellerChatFooter}>
+                <View style={styles.fortuneTellerChatBadge}>
+                  <MaterialCommunityIcons name="chat-processing" size={14} color={colors.success} />
+                  <Text style={styles.fortuneTellerChatBadgeText}>Mesaj başı ücretli</Text>
+                </View>
+                <View style={styles.fortuneTellerChatBadge}>
+                  <MaterialCommunityIcons name="account-group" size={14} color={colors.info} />
+                  <Text style={styles.fortuneTellerChatBadgeText}>Müsait falcılar</Text>
+                </View>
+              </View>
             </LinearGradient>
           </TouchableOpacity>
 
@@ -875,6 +907,23 @@ const HomeScreen = ({ navigation }) => {
               ))}
             </View>
           </View>
+
+          {/* Premium Üyelik Butonu */}
+          <TouchableOpacity 
+            style={styles.premiumButton}
+            onPress={() => navigation.navigate('BuyTokens')}
+          >
+            <LinearGradient
+              colors={[colors.social.google, colors.primary]}
+              style={styles.premiumGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            >
+              <Text style={styles.premiumEmoji}>👑</Text>
+              <Text style={styles.premiumText}>Premium Üye Ol</Text>
+              <Ionicons name="arrow-forward" size={20} color={colors.text.light} />
+            </LinearGradient>
+          </TouchableOpacity>
 
           {/* Detaylı Astroloji Analizi */}
           <AstrologyAnalysisCard 
@@ -2038,6 +2087,89 @@ const styles = StyleSheet.create({
   },
   modalCloseButton: {
     padding: 5,
+  },
+  // Falcı Sohbet Butonu Stilleri
+  fortuneTellerChatButton: {
+    marginHorizontal: 20,
+    marginTop: 20,
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  fortuneTellerChatGradient: {
+    padding: 20,
+    borderRadius: 20,
+  },
+  fortuneTellerChatContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  fortuneTellerChatLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  fortuneTellerChatIconContainer: {
+    position: 'relative',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255, 215, 0, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 15,
+    borderWidth: 2,
+    borderColor: colors.secondary,
+  },
+  onlinePulse: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: colors.success,
+    borderWidth: 2,
+    borderColor: '#8E2DE2',
+  },
+  fortuneTellerChatTextContainer: {
+    flex: 1,
+  },
+  fortuneTellerChatTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.text.light,
+    marginBottom: 4,
+  },
+  fortuneTellerChatSubtitle: {
+    fontSize: 14,
+    color: colors.text.secondary,
+  },
+  fortuneTellerChatRight: {
+    marginLeft: 10,
+  },
+  fortuneTellerChatFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 15,
+    paddingTop: 15,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  fortuneTellerChatBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  fortuneTellerChatBadgeText: {
+    fontSize: 12,
+    color: colors.text.secondary,
+    fontWeight: '500',
   },
 });
 

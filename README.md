@@ -1,4 +1,4 @@
-# Fal Uygulaması v1.0.11
+# Fal Uygulaması v1.1.2
 
 Bu proje, React Native ve Expo kullanılarak geliştirilmiş bir fal uygulamasıdır. Kullanıcılar fal gönderebilir, falcılarla mesajlaşabilir ve fal sonuçlarını görüntüleyebilir.
 
@@ -27,6 +27,44 @@ FalUygulamasi/
 ```
 
 ## Yeni Özellikler
+
+### Rozet Sistemi (v1.1.1)
+Kullanıcıların başarılarını ödüllendiren kapsamlı rozet sistemi eklendi:
+
+#### Özellikler:
+- **Aktif Kullanıcı Rozeti**: 7 gün üst üste giriş yaparak kazanılan rozet
+- **Falsever Rozeti**: Toplam 10 fal göndererek kazanılan rozet
+- **VIP Deneyim Rozeti**: İlk alım yaparak kazanılan rozet
+- **Otomatik Rozet Kontrolü**: Kullanıcı belirli koşulları sağladığında otomatik olarak rozet kazanır
+- **Pop-up Bildirim**: Rozet kazanıldığında animasyonlu pop-up ile kullanıcıya bildirim
+- **Profil Gösterimi**: Kazanılan rozetler profil ekranında görüntülenir
+- **Rozet İstatistikleri**: Profil üst kısmında toplam rozet sayısı gösterimi
+
+#### Rozet Türleri:
+- **Aktif Kullanıcı** (🔥): 7 gün üst üste giriş yap
+- **Falsever** (☕): Toplam 10 fal gönder
+- **VIP Deneyim** (💎): İlk alımını yap
+
+#### Teknik Implementasyon:
+- `badges` ve `user_badges` tabloları eklendi
+- `badgeService.js` servisi ile rozet yönetimi
+- `BadgeModal` komponenti ile animasyonlu rozet kazanma bildirimi
+- ProfileScreen'e rozet bölümü entegrasyonu
+- Günlük giriş, fal gönderme ve satın alma işlemlerine otomatik rozet kontrolü
+- Supabase RLS politikaları ile güvenli rozet yönetimi
+
+#### Kullanıcı Deneyimi:
+- **Görsel Rozetler**: Her rozet için özel ikon ve renk
+- **Animasyonlu Pop-up**: Rozet kazanıldığında göz alıcı animasyon
+- **Profil Entegrasyonu**: Rozetler profilde grid düzeninde gösterilir
+- **İlerleme Takibi**: 3 rozet arasından kaç tanesinin kazanıldığı gösterilir
+- **Motivasyon**: Kullanıcıları uygulama kullanımına teşvik eden başarı sistemi
+
+#### Veritabanı Değişiklikleri:
+- `badges` tablosu: Rozet tanımları ve kriterleri
+- `user_badges` tablosu: Kullanıcı rozet kayıtları
+- `users` tablosuna `total_badges_earned`, `total_fortunes_sent`, `first_purchase_date` alanları eklendi
+- Her kullanıcı bir rozeti sadece bir kez kazanabilir
 
 ### Admin Push Notification Sistemi (v1.0.11)
 Adminlerin kullanıcılara push notification gönderebileceği kapsamlı bildirim sistemi eklendi:

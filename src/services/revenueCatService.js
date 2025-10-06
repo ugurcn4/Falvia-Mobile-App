@@ -25,20 +25,41 @@ export const SUBSCRIPTION_INFO = {
   [SUBSCRIPTION_PRODUCTS.MINI_MONTHLY]: {
     title: 'Aylık Mini',
     price: '99,99₺',
-    features: ['2 Fal Hakkı', 'Jeton Alımlarında %10 İndirim'],
-    color: '#2196F3'
+    features: [
+      'Aylık 4 Fal Hakkı (40 Jeton)',
+      'Jeton Alımlarında %15 İndirim',
+      'Keşfet\'te Paylaşım Hakkı',
+      'Premium Rozetler',
+      'Sınırsız Fal Geçmişi',
+      'Öncelikli Destek'
+    ],
+    color: '#FFD700',
+    popular: true
   },
   [SUBSCRIPTION_PRODUCTS.STANDART_MONTHLY]: {
     title: 'Aylık Standart',
     price: '149,99₺',
-    features: ['4 Fal Hakkı', 'Jeton Alımlarında %15 İndirim', 'Keşfet\'te Paylaşım Hakkı'],
-    color: '#FFD700',
-    popular: true
+    features: [
+      'Aylık 2 Fal Hakkı (20 Jeton)',
+      'Jeton Alımlarında %10 İndirim',
+      'Premium Rozetler',
+      'Sınırsız Fal Geçmişi'
+    ],
+    color: '#2196F3'
   },
   [SUBSCRIPTION_PRODUCTS.PREMIUM_MONTHLY]: {
     title: 'Aylık Premium',
     price: '219,99₺',
-    features: ['6 Fal Hakkı', 'Jeton Alımlarında %20 İndirim', 'Fal Yorum Önceliği', 'Keşfet\'te Paylaşım Hakkı'],
+    features: [
+      'Aylık 6 Fal Hakkı (60 Jeton)',
+      'Jeton Alımlarında %20 İndirim',
+      'Fal Yorum Önceliği',
+      'Keşfet\'te Paylaşım Hakkı',
+      'Premium Rozetler',
+      'Sınırsız Fal Geçmişi',
+      'VIP Öncelikli Destek',
+      'Özel Falcı Erişimi'
+    ],
     color: '#9C27B0'
   }
 };

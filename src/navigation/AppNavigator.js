@@ -1,5 +1,6 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { StyleSheet, View, Text, Platform } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
@@ -26,6 +27,8 @@ import FortuneDetailScreen from '../screens/FortuneDetailScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import ReferralInviteScreen from '../screens/ReferralInviteScreen';
 import AstrologyAnalysisScreen from '../screens/AstrologyAnalysisScreen';
+import FortuneTellerListScreen from '../screens/FortuneTellerListScreen';
+import FortuneTellerChatScreen from '../screens/FortuneTellerChatScreen';
 
 // Colors
 import colors from '../styles/colors';
@@ -84,6 +87,32 @@ const HomeStack = () => (
       name="Notifications" 
       component={NotificationsScreen} 
       options={{ title: 'Bildirimler' }} 
+    />
+    <Stack.Screen 
+      name="FortuneTellerList" 
+      component={FortuneTellerListScreen} 
+      options={{ title: 'Falcılarımız' }} 
+    />
+    <Stack.Screen 
+      name="FortuneTellerChat" 
+      component={FortuneTellerChatScreen} 
+      options={{ 
+        title: 'Falcı Sohbeti',
+        headerShown: true,
+        headerStyle: {
+          backgroundColor: colors.primary,
+        },
+        headerTintColor: colors.text.light,
+        headerTitleStyle: {
+          fontWeight: '600',
+          fontSize: 18,
+        },
+      }} 
+    />
+    <Stack.Screen 
+      name="TokenStore" 
+      component={TokenStoreScreen} 
+      options={{ title: 'Jeton Mağazası' }} 
     />
   </Stack.Navigator>
 );
@@ -335,26 +364,32 @@ const ExploreStack = () => (
 const AppNavigator = () => {
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
+      screenOptions={{
         headerShown: false,
         tabBarStyle: styles.tabBar,
         tabBarActiveTintColor: colors.secondary,
         tabBarInactiveTintColor: colors.text.tertiary,
         tabBarLabelStyle: styles.tabBarLabel,
-        tabBarHideOnKeyboard: true,
-      })}
+      }}
     >
       <Tab.Screen 
         name="Home" 
         component={HomeStack} 
-        options={{
+        options={({ route }) => ({
           tabBarLabel: 'Ana Sayfa',
           tabBarIcon: ({ color, size, focused }) => (
             <View style={styles.iconContainer}>
               <Ionicons name={focused ? 'home' : 'home-outline'} size={24} color={color} />
             </View>
           ),
-        }}
+          tabBarStyle: ((route) => {
+            const routeName = getFocusedRouteNameFromRoute(route) ?? 'HomeScreen';
+            if (routeName === 'FortuneTellerChat') {
+              return { display: 'none' };
+            }
+            return styles.tabBar;
+          })(route),
+        })}
       />
       <Tab.Screen 
         name="Fal" 
@@ -371,14 +406,21 @@ const AppNavigator = () => {
       <Tab.Screen 
         name="Explore" 
         component={ExploreStack} 
-        options={{
+        options={({ route }) => ({
           tabBarLabel: 'Keşfet',
           tabBarIcon: ({ color, size, focused }) => (
             <View style={styles.iconContainer}>
               <Ionicons name={focused ? 'compass' : 'compass-outline'} size={24} color={color} />
             </View>
           ),
-        }}
+          tabBarStyle: ((route) => {
+            const routeName = getFocusedRouteNameFromRoute(route) ?? 'ExploreScreen';
+            if (routeName === 'ChatScreen') {
+              return { display: 'none' };
+            }
+            return styles.tabBar;
+          })(route),
+        })}
       />
       <Tab.Screen 
         name="Store" 

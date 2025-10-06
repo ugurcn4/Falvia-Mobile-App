@@ -1207,7 +1207,6 @@ ${selectedZodiac} burcu için ${period} dönem yorumu oluştur.`;
           }
         }
       } catch (error) {
-        console.log('Özel veri parse edilemedi:', error);
       }
     }
     
@@ -1252,7 +1251,6 @@ ${selectedZodiac} burcu için ${period} dönem yorumu oluştur.`;
         return summary;
       }
     } catch (error) {
-      console.log('Özel veri özetlenemedi:', error);
     }
     
     return '';

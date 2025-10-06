@@ -25,6 +25,7 @@ import AIFortuneService from '../services/aiFortuneService';
 import colors from '../styles/colors';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import badgeService from '../services/badgeService';
 
 // Kart falları için import'lar
 import CardComponent from '../components/CardComponent';
@@ -818,11 +819,36 @@ const NewFortuneScreen = () => {
         // Fal işlemi başarılıysa görev hatası işlemi durdurmasın
       }
       
-      Alert.alert(
-        'Falınız Gönderildi',
-        `${selectedFortuneTeller.name}, ${randomMinutes} dakika (tahmini) içinde size cevap verecektir. Hazır olduğunda bildirim alacaksınız.`,
-        [{ text: 'Tamam', onPress: () => navigation.navigate('FalScreen') }]
-      );
+      // Kullanıcının total_fortunes_sent değerini güncelle
+      const { data: userData } = await supabase
+        .from('users')
+        .select('total_fortunes_sent')
+        .eq('id', user.id)
+        .single();
+      
+      const newFortuneCount = (userData?.total_fortunes_sent || 0) + 1;
+      await supabase
+        .from('users')
+        .update({ total_fortunes_sent: newFortuneCount })
+        .eq('id', user.id);
+      
+      // Falsever rozetini kontrol et (10 fal gönderme)
+      const badgeResult = await badgeService.checkFortuneLoverBadge(user.id);
+      
+      if (badgeResult.success && badgeResult.newBadge) {
+        // Rozet kazanıldıysa özel mesaj göster
+        Alert.alert(
+          '🎉 Tebrikler!',
+          `Falınız gönderildi ve "${badgeResult.data.name}" rozetini kazandınız!\n\n${selectedFortuneTeller.name}, ${randomMinutes} dakika (tahmini) içinde size cevap verecektir.`,
+          [{ text: 'Harika!', onPress: () => navigation.navigate('FalScreen') }]
+        );
+      } else {
+        Alert.alert(
+          'Falınız Gönderildi',
+          `${selectedFortuneTeller.name}, ${randomMinutes} dakika (tahmini) içinde size cevap verecektir. Hazır olduğunda bildirim alacaksınız.`,
+          [{ text: 'Tamam', onPress: () => navigation.navigate('FalScreen') }]
+        );
+      }
     } catch (error) {
       console.error('Fal gönderilirken hata oluştu:', error);
       Alert.alert('Hata', 'Falınız gönderilirken bir hata oluştu. Lütfen tekrar deneyin.');

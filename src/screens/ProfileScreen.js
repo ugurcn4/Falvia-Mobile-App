@@ -25,6 +25,8 @@ import dailyLoginService from '../services/dailyLoginService';
 import PremiumTrialCard from '../components/PremiumTrialCard';
 import { checkUserSubscriptionWithTrial } from '../services/supabaseService';
 import { TrialService } from '../services/trialService';
+import BadgeModal from '../components/BadgeModal';
+import badgeService from '../services/badgeService';
 
 const ProfileScreen = ({ navigation, route }) => {
   const { user, logout } = useAuth();
@@ -40,6 +42,9 @@ const ProfileScreen = ({ navigation, route }) => {
   });
   const [subscriptionType, setSubscriptionType] = useState('free');
   const [showDailyLoginModal, setShowDailyLoginModal] = useState(false);
+  const [userBadges, setUserBadges] = useState([]);
+  const [showBadgeModal, setShowBadgeModal] = useState(false);
+  const [earnedBadge, setEarnedBadge] = useState(null);
 
   // Kullanıcı verilerini Supabase'den al
   const fetchUserData = async () => {
@@ -112,6 +117,14 @@ const ProfileScreen = ({ navigation, route }) => {
         });
       }
       
+      // Kullanıcının rozetlerini getir
+      if (authUser?.id) {
+        const badgesResult = await badgeService.getUserBadges(authUser.id);
+        if (badgesResult.success) {
+          setUserBadges(badgesResult.data);
+        }
+      }
+      
     } catch (error) {
       console.error('Veri çekerken hata:', error);
     } finally {
@@ -167,6 +180,12 @@ const ProfileScreen = ({ navigation, route }) => {
         if (dailyLoginResult.success) {
           // Ödül alındıysa modal'ı göster
           setShowDailyLoginModal(true);
+          
+          // Rozet kazanıldıysa rozet modalını göster
+          if (dailyLoginResult.badge) {
+            setEarnedBadge(dailyLoginResult.badge);
+            setShowBadgeModal(true);
+          }
         }
       }
       
@@ -476,9 +495,108 @@ const ProfileScreen = ({ navigation, route }) => {
 
               {/* Ayraç */}
               <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.2)' }} />
+
+              {/* Rozet Sayısı */}
+              <View style={{ flex: 1, alignItems: 'center' }}>
+                <View style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  backgroundColor: 'rgba(255,255,255,0.1)',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginBottom: 8,
+                }}>
+                  <Ionicons name="trophy" size={22} color={colors.secondary} />
+                </View>
+                <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text.light }}>{userBadges.length}</Text>
+                <Text style={{ fontSize: 12, color: colors.text.secondary }}>Rozet</Text>
+              </View>
             </View>
           </View>
         </LinearGradient>
+
+        {/* Rozetler Bölümü */}
+        {userBadges.length > 0 && (
+          <View style={{
+            backgroundColor: colors.card,
+            borderRadius: 15,
+            marginHorizontal: 20,
+            marginTop: 20,
+            padding: 15,
+            shadowColor: colors.shadow,
+            shadowOffset: { width: 0, height: 3 },
+            shadowOpacity: 0.2,
+            shadowRadius: 5,
+            elevation: 5,
+            borderWidth: 1,
+            borderColor: colors.border,
+          }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Ionicons name="trophy" size={20} color={colors.secondary} />
+                <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text.primary, marginLeft: 8 }}>
+                  Kazanılan Rozetler
+                </Text>
+              </View>
+              <View style={{
+                backgroundColor: colors.secondary,
+                paddingHorizontal: 10,
+                paddingVertical: 4,
+                borderRadius: 12,
+              }}>
+                <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.text.dark }}>
+                  {userBadges.length}/3
+                </Text>
+              </View>
+            </View>
+
+            {/* Rozetler Grid */}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-start' }}>
+              {userBadges.map((badge, index) => (
+                <View key={badge.id || index} style={{
+                  width: '30%',
+                  marginRight: '3.33%',
+                  marginBottom: 15,
+                  alignItems: 'center',
+                }}>
+                  <View style={{
+                    width: 70,
+                    height: 70,
+                    borderRadius: 35,
+                    backgroundColor: badge.color || colors.primary,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    shadowColor: badge.color || colors.primary,
+                    shadowOffset: { width: 0, height: 3 },
+                    shadowOpacity: 0.4,
+                    shadowRadius: 5,
+                    elevation: 5,
+                    marginBottom: 8,
+                  }}>
+                    <Ionicons name={badge.iconName || 'star'} size={36} color="#fff" />
+                  </View>
+                  <Text style={{
+                    fontSize: 11,
+                    color: colors.text.primary,
+                    textAlign: 'center',
+                    fontWeight: '600',
+                  }} numberOfLines={2}>
+                    {badge.name}
+                  </Text>
+                  <Text style={{
+                    fontSize: 9,
+                    color: colors.text.tertiary,
+                    textAlign: 'center',
+                    marginTop: 2,
+                  }}>
+                    {new Date(badge.earned_at).toLocaleDateString('tr-TR')}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
 
         {/* Günlük Giriş Ödülü Kartı */}
         <DailyLoginStatusCard
@@ -497,6 +615,12 @@ const ProfileScreen = ({ navigation, route }) => {
                   ...prevStats,
                   tokens: result.data.totalBalance
                 }));
+
+                // Rozet kazanıldıysa rozet modalını göster
+                if (result.badge) {
+                  setEarnedBadge(result.badge);
+                  setShowBadgeModal(true);
+                }
               }
               // Modal'ı göster
               setShowDailyLoginModal(true);
@@ -552,6 +676,18 @@ const ProfileScreen = ({ navigation, route }) => {
               ...prevStats,
               tokens: rewardData.totalBalance
             }));
+          }}
+        />
+
+        {/* Rozet Kazanma Modal */}
+        <BadgeModal
+          visible={showBadgeModal}
+          badge={earnedBadge}
+          onClose={() => {
+            setShowBadgeModal(false);
+            setEarnedBadge(null);
+            // Rozetleri yenile
+            fetchUserData();
           }}
         />
 

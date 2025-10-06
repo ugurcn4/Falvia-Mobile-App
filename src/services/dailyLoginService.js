@@ -1,5 +1,6 @@
 import { supabase } from '../../lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import badgeService from './badgeService';
 
 class DailyLoginService {
   // Günlük giriş ödülünü kontrol et ve ver
@@ -134,6 +135,12 @@ class DailyLoginService {
         console.error('Jeton işlemi kaydedilemedi:', transactionError);
       }
 
+      // Aktif Kullanıcı rozetini kontrol et (7 gün üst üste giriş)
+      let badgeResult = null;
+      if (consecutiveDays >= 7) {
+        badgeResult = await badgeService.checkActiveUserBadge(userId);
+      }
+
       return {
         success: true,
         message: this.getRewardMessage(consecutiveDays, tokensEarned),
@@ -141,7 +148,8 @@ class DailyLoginService {
           consecutiveDays,
           tokensEarned,
           totalBalance: (profile.token_balance || 0) + tokensEarned
-        }
+        },
+        badge: badgeResult && badgeResult.success && badgeResult.newBadge ? badgeResult.data : null
       };
 
     } catch (error) {

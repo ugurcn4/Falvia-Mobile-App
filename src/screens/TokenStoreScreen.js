@@ -23,6 +23,8 @@ import colors from '../styles/colors';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import AnimatedButton from '../components/AnimatedButton';
+import PremiumButton from '../components/PremiumButton';
+import PremiumPackageCard from '../components/PremiumPackageCard';
 import PremiumTrialCard from '../components/PremiumTrialCard';
 
 // RevenueCat servisleri
@@ -49,6 +51,7 @@ import {
 
 // Trial servisleri
 import { TrialService } from '../services/trialService';
+import badgeService from '../services/badgeService';
 
 const { width } = Dimensions.get('window');
 const cardWidth = width * 0.85;
@@ -194,7 +197,17 @@ const TokenStoreScreen = ({ navigation }) => {
           return productId.includes('monthly') || productId.includes('yearly') || productId.includes('subscription');
         });
         
-        setAvailablePackages(subscriptionPacks);
+        // Paketleri sırala: Mini (popüler) en üstte
+        const sortedPacks = subscriptionPacks.sort((a, b) => {
+          const aId = a.product.identifier.split(':')[0].toLowerCase();
+          const bId = b.product.identifier.split(':')[0].toLowerCase();
+          
+          // Sıralama önceliği: mini -> standart -> premium
+          const order = { 'mini_monthly': 1, 'standart_monthly': 2, 'premium_monthly': 3 };
+          return (order[aId] || 999) - (order[bId] || 999);
+        });
+        
+        setAvailablePackages(sortedPacks);
       } else {
         console.error('Abonelik paketleri alma hatası:', result.error);
         Alert.alert('Hata', 'Abonelik paketleri yüklenemedi.');
@@ -330,11 +343,43 @@ const TokenStoreScreen = ({ navigation }) => {
           }
         }
         
-        Alert.alert(
-          'Başarılı!',
-          'Aboneliğiniz aktif edildi. Tüm premium özelliklere erişebilirsiniz!',
-          [{ text: 'Tamam', onPress: () => navigation.goBack() }]
-        );
+        // İlk alım rozetini kontrol et
+        const { data: userData } = await supabase
+          .from('users')
+          .select('first_purchase_date')
+          .eq('id', user.id)
+          .single();
+        
+        // Eğer ilk alım değilse, first_purchase_date'i güncelle
+        if (!userData?.first_purchase_date) {
+          await supabase
+            .from('users')
+            .update({ first_purchase_date: new Date().toISOString() })
+            .eq('id', user.id);
+          
+          // VIP Deneyim rozetini kontrol et
+          const badgeResult = await badgeService.checkFirstPurchaseBadge(user.id);
+          
+          if (badgeResult.success && badgeResult.newBadge) {
+            Alert.alert(
+              '🎉 Tebrikler!',
+              `Aboneliğiniz aktif edildi ve "${badgeResult.data.name}" rozetini kazandınız! Tüm premium özelliklere erişebilirsiniz!`,
+              [{ text: 'Harika!', onPress: () => navigation.goBack() }]
+            );
+          } else {
+            Alert.alert(
+              'Başarılı!',
+              'Aboneliğiniz aktif edildi. Tüm premium özelliklere erişebilirsiniz!',
+              [{ text: 'Tamam', onPress: () => navigation.goBack() }]
+            );
+          }
+        } else {
+          Alert.alert(
+            'Başarılı!',
+            'Aboneliğiniz aktif edildi. Tüm premium özelliklere erişebilirsiniz!',
+            [{ text: 'Tamam', onPress: () => navigation.goBack() }]
+          );
+        }
       } else {
         // Hata durumu
         Alert.alert(
@@ -398,8 +443,8 @@ const TokenStoreScreen = ({ navigation }) => {
   // Abonelik tipine göre bonus jeton miktarını al
   const getBonusTokensForSubscription = (productId) => {
     const bonusTokens = {
-      [SUBSCRIPTION_PRODUCTS.MINI_MONTHLY]: 20,
-      [SUBSCRIPTION_PRODUCTS.STANDART_MONTHLY]: 40,
+      [SUBSCRIPTION_PRODUCTS.MINI_MONTHLY]: 40,
+      [SUBSCRIPTION_PRODUCTS.STANDART_MONTHLY]: 20,
       [SUBSCRIPTION_PRODUCTS.PREMIUM_MONTHLY]: 60
     };
     return bonusTokens[productId] || 0;
@@ -447,11 +492,43 @@ const TokenStoreScreen = ({ navigation }) => {
         await updateTokenBalance(user.id, pack.tokens, 'token_purchase', pack.package.product.identifier);
         await fetchUserTokens();
         
-        Alert.alert(
-          'Başarılı!',
-          `${pack.tokens} jeton hesabınıza eklendi!`,
-          [{ text: 'Tamam' }]
-        );
+        // İlk alım rozetini kontrol et
+        const { data: userData } = await supabase
+          .from('users')
+          .select('first_purchase_date')
+          .eq('id', user.id)
+          .single();
+        
+        // Eğer ilk alım değilse, first_purchase_date'i güncelle
+        if (!userData?.first_purchase_date) {
+          await supabase
+            .from('users')
+            .update({ first_purchase_date: new Date().toISOString() })
+            .eq('id', user.id);
+          
+          // VIP Deneyim rozetini kontrol et
+          const badgeResult = await badgeService.checkFirstPurchaseBadge(user.id);
+          
+          if (badgeResult.success && badgeResult.newBadge) {
+            Alert.alert(
+              '🎉 Tebrikler!',
+              `${pack.tokens} jeton hesabınıza eklendi ve "${badgeResult.data.name}" rozetini kazandınız!`,
+              [{ text: 'Harika!' }]
+            );
+          } else {
+            Alert.alert(
+              'Başarılı!',
+              `${pack.tokens} jeton hesabınıza eklendi!`,
+              [{ text: 'Tamam' }]
+            );
+          }
+        } else {
+          Alert.alert(
+            'Başarılı!',
+            `${pack.tokens} jeton hesabınıza eklendi!`,
+            [{ text: 'Tamam' }]
+          );
+        }
       } else {
         Alert.alert(
           'Satın Alma Hatası',
@@ -535,46 +612,77 @@ const TokenStoreScreen = ({ navigation }) => {
   // Tab navigation render fonksiyonu
   const renderTabNavigation = () => {
     return (
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[
-            styles.tabButton,
-            activeTab === 'subscription' && styles.activeTabButton
-          ]}
-          onPress={() => setActiveTab('subscription')}
+      <View style={styles.tabWrapper}>
+        <LinearGradient
+          colors={['#FFD700', '#FFF8DC', '#FFD700']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.tabBorder}
         >
-          <MaterialCommunityIcons 
-            name="crown" 
-            size={20} 
-            color={activeTab === 'subscription' ? colors.text.light : colors.text.tertiary} 
-          />
-          <Text style={[
-            styles.tabText,
-            activeTab === 'subscription' && styles.activeTabText
-          ]}>
-            Abonelik
-          </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={[
-            styles.tabButton,
-            activeTab === 'tokens' && styles.activeTabButton
-          ]}
-          onPress={() => setActiveTab('tokens')}
-        >
-          <MaterialCommunityIcons 
-            name="diamond" 
-            size={20} 
-            color={activeTab === 'tokens' ? colors.text.light : colors.text.tertiary} 
-          />
-          <Text style={[
-            styles.tabText,
-            activeTab === 'tokens' && styles.activeTabText
-          ]}>
-            Jeton Paketleri
-          </Text>
-        </TouchableOpacity>
+          <View style={styles.tabContainer}>
+            <TouchableOpacity
+              style={styles.tabButton}
+              onPress={() => setActiveTab('subscription')}
+              activeOpacity={0.8}
+            >
+              {activeTab === 'subscription' ? (
+                <LinearGradient
+                  colors={['#FFD700', '#FFF8DC', '#FFD700']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.activeTabButton}
+                >
+                  <MaterialCommunityIcons 
+                    name="crown" 
+                    size={20} 
+                    color={colors.text.dark} 
+                  />
+                  <Text style={styles.activeTabText}>Abonelik</Text>
+                </LinearGradient>
+              ) : (
+                <View style={styles.inactiveTabButton}>
+                  <MaterialCommunityIcons 
+                    name="crown" 
+                    size={20} 
+                    color={colors.text.tertiary} 
+                  />
+                  <Text style={styles.tabText}>Abonelik</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={styles.tabButton}
+              onPress={() => setActiveTab('tokens')}
+              activeOpacity={0.8}
+            >
+              {activeTab === 'tokens' ? (
+                <LinearGradient
+                  colors={['#FFD700', '#FFF8DC', '#FFD700']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.activeTabButton}
+                >
+                  <MaterialCommunityIcons 
+                    name="diamond" 
+                    size={20} 
+                    color={colors.text.dark} 
+                  />
+                  <Text style={styles.activeTabText}>Jeton Paketleri</Text>
+                </LinearGradient>
+              ) : (
+                <View style={styles.inactiveTabButton}>
+                  <MaterialCommunityIcons 
+                    name="diamond" 
+                    size={20} 
+                    color={colors.text.tertiary} 
+                  />
+                  <Text style={styles.tabText}>Jeton Paketleri</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
       </View>
     );
   };
@@ -583,22 +691,43 @@ const TokenStoreScreen = ({ navigation }) => {
   const renderSubscriptionPackages = () => {
     return (
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Abonelik Paketleri</Text>
+        <View style={styles.sectionTitleRow}>
+          <MaterialCommunityIcons name="crown" size={24} color={colors.secondary} />
+          <Text style={styles.sectionTitle}>Abonelik Paketleri</Text>
+        </View>
         <Text style={styles.sectionSubtitle}>Her ay düzenli fal baktıranlar için özel fırsatlar</Text>
         
         {availablePackages.length > 0 ? (
           availablePackages.map((packageItem) => {
             const productId = packageItem.product.identifier;
             
+            // ProductId'yi temizle (RevenueCat ':p1m' gibi ekler ekliyor)
+            const cleanProductId = productId.split(':')[0];
+            
             // Preview modunda gelen paketler için varsayılan bilgiler
-            let subscriptionInfo = SUBSCRIPTION_INFO[productId];
+            // Önce tam eşleşme dene
+            let subscriptionInfo = SUBSCRIPTION_INFO[cleanProductId];
+            
+            // Tam eşleşme yoksa, küçük harfe çevirip dene
+            if (!subscriptionInfo) {
+              const normalizedId = cleanProductId.toLowerCase();
+              subscriptionInfo = SUBSCRIPTION_INFO[normalizedId];
+            }
+            
+
             
             // Eğer paket bilgisi yoksa varsayılan bilgiler oluştur
             if (!subscriptionInfo) {
               subscriptionInfo = {
                 title: packageItem.product.title || 'Premium Paket',
                 price: packageItem.product.priceString || '99,99₺',
-                features: ['Fal Hakkı', 'Premium Özellikler', 'Öncelikli Destek'],
+                features: [
+                  'Aylık Fal Hakkı',
+                  'Jeton Alımlarında İndirim',
+                  'Premium Rozetler',
+                  'Sınırsız Fal Geçmişi',
+                  'Öncelikli Destek'
+                ],
                 color: colors.secondary,
                 popular: false
               };
@@ -607,57 +736,22 @@ const TokenStoreScreen = ({ navigation }) => {
             const isLoading = loading && loadingPackageId === productId;
             
             return (
-              <TouchableOpacity 
+              <PremiumPackageCard
                 key={productId}
-                style={[
-                  styles.subscriptionCard,
-                  subscriptionInfo.popular && styles.popularSubscription
-                ]}
+                type="subscription"
+                title={subscriptionInfo.title}
+                price={packageItem.product.priceString}
+                priceNote="/ay"
+                features={subscriptionInfo.features}
+                icon="crown"
+                iconColor={subscriptionInfo.color}
+                iconLabel="Premium"
+                popular={subscriptionInfo.popular}
+                buttonText="Abone Ol"
                 onPress={() => handleSubscriptionPurchase(packageItem)}
+                loading={isLoading}
                 disabled={loading}
-                activeOpacity={0.9}
-              >
-                {subscriptionInfo.popular && (
-                  <View style={styles.popularBadge}>
-                    <Text style={styles.popularText}>En Popüler</Text>
-                  </View>
-                )}
-                
-                <View style={styles.subscriptionCardContent}>
-                  <View style={styles.subscriptionIconSection}>
-                    <View style={[styles.subscriptionIconContainer, { backgroundColor: subscriptionInfo.color }]}>
-                      <MaterialCommunityIcons name="crown" size={28} color={colors.text.light} />
-                    </View>
-                    <Text style={styles.subscriptionIconLabel}>Premium</Text>
-                  </View>
-                  
-                  <View style={styles.subscriptionInfoSection}>
-                    <Text style={styles.subscriptionName}>{subscriptionInfo.title}</Text>
-                    <Text style={styles.subscriptionPrice}>
-                      {packageItem.product.priceString}
-                      <Text style={styles.perMonth}>/ay</Text>
-                    </Text>
-                    
-                    <View style={styles.subscriptionFeatures}>
-                      {subscriptionInfo.features.map((feature, index) => (
-                        <View key={index} style={styles.featureRow}>
-                          <Ionicons name="checkmark-circle" size={16} color={colors.success} />
-                          <Text style={styles.featureText}>{feature}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  </View>
-                </View>
-                
-                <AnimatedButton
-                  onPress={() => handleSubscriptionPurchase(packageItem)}
-                  title="Abone Ol"
-                  loading={isLoading}
-                  disabled={loading}
-                  style={[styles.subscriptionButton, { backgroundColor: colors.secondary }]}
-                  textStyle={styles.subscriptionButtonText}
-                />
-              </TouchableOpacity>
+              />
             );
           })
         ) : loadingSubscriptions ? (
@@ -680,7 +774,10 @@ const TokenStoreScreen = ({ navigation }) => {
   const renderTokenPackages = () => {
     return (
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Ek Jeton Paketleri</Text>
+        <View style={styles.sectionTitleRow}>
+          <MaterialCommunityIcons name="diamond" size={24} color={colors.secondary} />
+          <Text style={styles.sectionTitle}>Ek Jeton Paketleri</Text>
+        </View>
         <Text style={styles.sectionSubtitle}>Abonelik dışında ek jeton satın alabilirsiniz</Text>
         
         {loadingTokenPackages ? (
@@ -690,55 +787,25 @@ const TokenStoreScreen = ({ navigation }) => {
           </View>
         ) : tokenPackages.length > 0 ? (
           tokenPackages.map((pack) => (
-            <View 
+            <PremiumPackageCard
               key={pack.id}
-              style={styles.packageCard}
-            >
-              <View style={styles.packageCardContent}>
-                <View style={styles.packageIconSection}>
-                  <View style={[styles.packageIconContainer, { backgroundColor: pack.color }]}>
-                    <MaterialCommunityIcons name="diamond" size={28} color={colors.text.light} />
-                    <Text style={styles.packageTokens}>{pack.tokens}</Text>
-                  </View>
-                  <Text style={styles.packageIconLabel}>Jeton</Text>
-                </View>
-                
-                <View style={styles.packageInfoSection}>
-                  <Text style={styles.packageName}>{pack.name}</Text>
-                  <Text style={styles.packageDescription}>{pack.description}</Text>
-                  
-                  <View style={styles.packageFeatures}>
-                    {pack.features.map((feature, index) => (
-                      <View key={index} style={styles.featureRow}>
-                        <Ionicons name="checkmark-circle" size={16} color={colors.success} />
-                        <Text style={styles.featureText}>{feature}</Text>
-                      </View>
-                    ))}
-                  </View>
-                  
-                  <View style={styles.packagePricing}>
-                    <Text style={styles.packagePrice}>{pack.price}</Text>
-                    {pack.originalPrice && (
-                      <Text style={styles.originalPrice}>{pack.originalPrice}</Text>
-                    )}
-                    {pack.discount && pack.discount !== '0%' && (
-                      <View style={styles.discountBadge}>
-                        <Text style={styles.discountText}>{pack.discount} İndirim</Text>
-                      </View>
-                    )}
-                  </View>
-                </View>
-              </View>
-              
-              <AnimatedButton
-                onPress={() => handleTokenPurchase(pack)}
-                title="Satın Al"
-                loading={loading}
-                disabled={loading}
-                style={[styles.buyButton, { backgroundColor: colors.secondary }]}
-                textStyle={styles.buyButtonText}
-              />
-            </View>
+              type="token"
+              title={pack.name}
+              description={pack.description}
+              price={pack.price}
+              originalPrice={pack.originalPrice}
+              discount={pack.discount}
+              features={pack.features}
+              icon="diamond"
+              iconColor={pack.color}
+              iconLabel="Jeton"
+              tokenCount={pack.tokens}
+              popular={pack.popular}
+              buttonText="Satın Al"
+              onPress={() => handleTokenPurchase(pack)}
+              loading={loading}
+              disabled={loading}
+            />
           ))
         ) : (
           <View style={styles.noPackagesContainer}>
@@ -767,30 +834,61 @@ const TokenStoreScreen = ({ navigation }) => {
       
       {/* Header */}
       <LinearGradient
-        colors={[colors.primary, colors.primaryDark]}
+        colors={['#4A0080', '#6A1B9A', '#4A0080']}
         start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
+        end={{ x: 1, y: 1 }}
         style={styles.header}
       >
+        {/* Decorative elements */}
+        <View style={styles.headerDecoTop} />
+        <View style={styles.headerDecoBottom} />
+        
         <View style={styles.headerContent}>
           <TouchableOpacity 
             style={styles.backButton}
             onPress={() => navigation.goBack()}
+            activeOpacity={0.8}
           >
-            <Ionicons name="arrow-back" size={24} color={colors.text.light} />
+            <LinearGradient
+              colors={['rgba(255, 215, 0, 0.2)', 'rgba(255, 255, 255, 0.1)']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.backButtonGradient}
+            >
+              <Ionicons name="arrow-back" size={24} color={colors.text.light} />
+            </LinearGradient>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Mağaza</Text>
+          
+          <View style={styles.headerTitleContainer}>
+            <MaterialCommunityIcons name="shopping" size={22} color={colors.secondary} />
+            <Text style={styles.headerTitle}>Mağaza</Text>
+          </View>
+          
           <View style={styles.headerRight}>
-            <View style={styles.tokenContainer}>
-              <MaterialCommunityIcons name="diamond" size={18} color={colors.secondary} />
+            <LinearGradient
+              colors={['#FFD700', '#FFF8DC', '#FFD700']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.tokenContainer}
+            >
+              <MaterialCommunityIcons name="diamond" size={18} color={colors.text.dark} />
               <Text style={styles.tokenText}>{userTokens}</Text>
-            </View>
+            </LinearGradient>
+            
             <TouchableOpacity 
               style={styles.restoreButton}
               onPress={handleRestorePurchases}
               disabled={loading}
+              activeOpacity={0.8}
             >
-              <Ionicons name="refresh" size={20} color={colors.text.light} />
+              <LinearGradient
+                colors={['rgba(255, 215, 0, 0.2)', 'rgba(255, 255, 255, 0.1)']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.restoreButtonGradient}
+              >
+                <Ionicons name="refresh" size={20} color={colors.text.light} />
+              </LinearGradient>
             </TouchableOpacity>
           </View>
         </View>
@@ -814,29 +912,60 @@ const TokenStoreScreen = ({ navigation }) => {
         {renderSubscriptionStatus()}
 
         {/* Üst Banner */}
-        <LinearGradient
-          colors={[colors.primaryLight, colors.primary]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.banner}
-        >
-          <View style={styles.bannerContent}>
-            <View style={styles.bannerTextContainer}>
-              <Text style={styles.bannerTitle}>Premium Abonelik ile Sınırsız Fal!</Text>
-              <Text style={styles.bannerSubtitle}>
-                Aylık paketler ile daha fazla fal hakkı ve avantajlar
-              </Text>
-            </View>
-            <View style={styles.bannerImageContainer}>
+        <View style={styles.bannerWrapper}>
+          <LinearGradient
+            colors={['#FFD700', '#FFF8DC', '#FFD700']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.bannerBorder}
+          >
+            <LinearGradient
+              colors={['#6A1B9A', '#4A0080']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.banner}
+            >
+              {/* Decorative sparkles */}
               <MaterialCommunityIcons 
-                name="crystal-ball" 
-                size={60} 
-                color={colors.secondary} 
-                style={styles.bannerImage}
+                name="sparkles" 
+                size={20} 
+                color="rgba(255, 215, 0, 0.3)" 
+                style={styles.sparkle1}
               />
-            </View>
-          </View>
-        </LinearGradient>
+              <MaterialCommunityIcons 
+                name="sparkles" 
+                size={16} 
+                color="rgba(255, 215, 0, 0.2)" 
+                style={styles.sparkle2}
+              />
+              
+              <View style={styles.bannerContent}>
+                <View style={styles.bannerTextContainer}>
+                  <View style={styles.bannerTitleRow}>
+                    <MaterialCommunityIcons name="crown" size={24} color={colors.secondary} />
+                    <Text style={styles.bannerTitle}>Premium Abonelik</Text>
+                  </View>
+                  <Text style={styles.bannerSubtitle}>
+                    Sınırsız fal deneyimi ve özel avantajlar
+                  </Text>
+                </View>
+                <View style={styles.bannerImageContainer}>
+                  <LinearGradient
+                    colors={['rgba(255, 215, 0, 0.3)', 'rgba(255, 215, 0, 0.1)']}
+                    style={styles.bannerIconGradient}
+                  >
+                    <MaterialCommunityIcons 
+                      name="crystal-ball" 
+                      size={50} 
+                      color={colors.secondary} 
+                      style={styles.bannerImage}
+                    />
+                  </LinearGradient>
+                </View>
+              </View>
+            </LinearGradient>
+          </LinearGradient>
+        </View>
 
         {/* Premium Deneme Kartı - Büyük Boyut */}
         <PremiumTrialCard
@@ -895,30 +1024,69 @@ const TokenStoreScreen = ({ navigation }) => {
 
         {/* Neden Abonelik Almalıyım? */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Neden Abonelik Almalıyım?</Text>
+          <View style={styles.sectionTitleRow}>
+            <MaterialCommunityIcons name="information" size={24} color={colors.secondary} />
+            <Text style={styles.sectionTitle}>Neden Premium?</Text>
+          </View>
           <View style={styles.reasonsContainer}>
-            <View style={styles.reasonCard}>
-              <View style={[styles.reasonIcon, { backgroundColor: colors.primaryLight }]}>
-                <Ionicons name="time" size={24} color={colors.text.light} />
-              </View>
-              <Text style={styles.reasonTitle}>Aylık Fal Hakkı</Text>
-              <Text style={styles.reasonText}>Her ay belirli sayıda fal hakkınız olur</Text>
+            <View style={styles.reasonCardWrapper}>
+              <LinearGradient
+                colors={['#FFD700', '#FFF8DC']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.reasonCardBorder}
+              >
+                <View style={styles.reasonCard}>
+                  <LinearGradient
+                    colors={['#6A1B9A', '#4A0080']}
+                    style={styles.reasonIcon}
+                  >
+                    <Ionicons name="time" size={24} color={colors.secondary} />
+                  </LinearGradient>
+                  <Text style={styles.reasonTitle}>Aylık Fal Hakkı</Text>
+                  <Text style={styles.reasonText}>Her ay belirli sayıda fal hakkınız olur</Text>
+                </View>
+              </LinearGradient>
             </View>
             
-            <View style={styles.reasonCard}>
-              <View style={[styles.reasonIcon, { backgroundColor: colors.success }]}>
-                <Ionicons name="people" size={24} color={colors.text.light} />
-              </View>
-              <Text style={styles.reasonTitle}>Keşfet Hakkı</Text>
-              <Text style={styles.reasonText}>Keşfet sayfasında paylaşım yapma hakkı</Text>
+            <View style={styles.reasonCardWrapper}>
+              <LinearGradient
+                colors={['#FFD700', '#FFF8DC']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.reasonCardBorder}
+              >
+                <View style={styles.reasonCard}>
+                  <LinearGradient
+                    colors={['#6A1B9A', '#4A0080']}
+                    style={styles.reasonIcon}
+                  >
+                    <Ionicons name="people" size={24} color={colors.secondary} />
+                  </LinearGradient>
+                  <Text style={styles.reasonTitle}>Keşfet Hakkı</Text>
+                  <Text style={styles.reasonText}>Keşfet sayfasında paylaşım yapma hakkı</Text>
+                </View>
+              </LinearGradient>
             </View>
             
-            <View style={styles.reasonCard}>
-              <View style={[styles.reasonIcon, { backgroundColor: colors.secondary }]}>
-                <Ionicons name="sparkles" size={24} color={colors.text.light} />
-              </View>
-              <Text style={styles.reasonTitle}>Jeton İndirimi</Text>
-              <Text style={styles.reasonText}>Jeton alımlarında özel indirimler</Text>
+            <View style={styles.reasonCardWrapper}>
+              <LinearGradient
+                colors={['#FFD700', '#FFF8DC']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.reasonCardBorder}
+              >
+                <View style={styles.reasonCard}>
+                  <LinearGradient
+                    colors={['#6A1B9A', '#4A0080']}
+                    style={styles.reasonIcon}
+                  >
+                    <Ionicons name="sparkles" size={24} color={colors.secondary} />
+                  </LinearGradient>
+                  <Text style={styles.reasonTitle}>Jeton İndirimi</Text>
+                  <Text style={styles.reasonText}>Jeton alımlarında özel indirimler</Text>
+                </View>
+              </LinearGradient>
             </View>
           </View>
         </View>
@@ -928,7 +1096,7 @@ const TokenStoreScreen = ({ navigation }) => {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>🧪 Test Alanı</Text>
             <View style={styles.testContainer}>
-              <AnimatedButton
+              <PremiumButton
                 onPress={async () => {
                   try {
                     const result = await testPurchase('mini_monthly');
@@ -944,11 +1112,14 @@ const TokenStoreScreen = ({ navigation }) => {
                   }
                 }}
                 title="Mini Test Satın Al"
-                style={[styles.testButton, { backgroundColor: colors.secondary }]}
-                textStyle={[styles.testButtonText, { color: colors.text.dark }]}
+                icon="test-tube"
+                iconSize={20}
+                variant="secondary"
+                style={styles.testButton}
+                textStyle={styles.testButtonText}
               />
               
-              <AnimatedButton
+              <PremiumButton
                 onPress={async () => {
                   try {
                     const result = await testPurchase('standart_monthly');
@@ -964,11 +1135,14 @@ const TokenStoreScreen = ({ navigation }) => {
                   }
                 }}
                 title="Standart Test Satın Al"
-                style={[styles.testButton, { backgroundColor: colors.secondary }]}
-                textStyle={[styles.testButtonText, { color: colors.text.dark }]}
+                icon="test-tube"
+                iconSize={20}
+                variant="secondary"
+                style={styles.testButton}
+                textStyle={styles.testButtonText}
               />
               
-              <AnimatedButton
+              <PremiumButton
                 onPress={async () => {
                   try {
                     const result = await testPurchase('premium_monthly');
@@ -984,21 +1158,27 @@ const TokenStoreScreen = ({ navigation }) => {
                   }
                 }}
                 title="Premium Test Satın Al"
-                style={[styles.testButton, { backgroundColor: colors.secondary }]}
-                textStyle={[styles.testButtonText, { color: colors.text.dark }]}
+                icon="test-tube"
+                iconSize={20}
+                variant="secondary"
+                style={styles.testButton}
+                textStyle={styles.testButtonText}
               />
               
-              <AnimatedButton
+              <PremiumButton
                 onPress={async () => {
                   const info = await getTestUserInfo();
                   Alert.alert('Test Kullanıcı Bilgisi', JSON.stringify(info, null, 2));
                 }}
                 title="Kullanıcı Bilgilerini Göster"
-                style={[styles.testButton, { backgroundColor: colors.border }]}
-                textStyle={[styles.testButtonText, { color: colors.text.secondary }]}
+                icon="account-circle"
+                iconSize={20}
+                variant="outlined"
+                style={styles.testButton}
+                textStyle={styles.testButtonText}
               />
 
-              <AnimatedButton
+              <PremiumButton
                 onPress={async () => {
                   try {
                     if (!user?.id) return Alert.alert('Hata', 'Önce giriş yapın');
@@ -1026,11 +1206,14 @@ const TokenStoreScreen = ({ navigation }) => {
                   }
                 }}
                 title="Test 10 Jeton Satın Al"
-                style={[styles.testButton, { backgroundColor: colors.secondary }]}
-                textStyle={[styles.testButtonText, { color: colors.text.dark }]}
+                icon="diamond"
+                iconSize={20}
+                variant="secondary"
+                style={styles.testButton}
+                textStyle={styles.testButtonText}
               />
 
-              <AnimatedButton
+              <PremiumButton
                 onPress={async () => {
                   try {
                     if (!user?.id) return Alert.alert('Hata', 'Önce giriş yapın');
@@ -1058,13 +1241,16 @@ const TokenStoreScreen = ({ navigation }) => {
                   }
                 }}
                 title="Test 30 Jeton Satın Al"
-                style={[styles.testButton, { backgroundColor: colors.secondary }]}
-                textStyle={[styles.testButtonText, { color: colors.text.dark }]}
+                icon="diamond"
+                iconSize={20}
+                variant="secondary"
+                style={styles.testButton}
+                textStyle={styles.testButtonText}
               />
 
               {__DEV__ && (
                 <>
-                  <AnimatedButton
+                  <PremiumButton
                     onPress={async () => {
                       try {
                         if (!user?.id) return Alert.alert('Hata', 'Önce giriş yapın');
@@ -1076,11 +1262,14 @@ const TokenStoreScreen = ({ navigation }) => {
                       }
                     }}
                     title="Simülasyon: 10 Jeton Ekle"
-                    style={[styles.testButton, { backgroundColor: colors.success }]}
-                    textStyle={[styles.testButtonText, { color: colors.text.light }]}
+                    icon="plus-circle"
+                    iconSize={20}
+                    variant="primary"
+                    style={styles.testButton}
+                    textStyle={styles.testButtonText}
                   />
 
-                  <AnimatedButton
+                  <PremiumButton
                     onPress={async () => {
                       try {
                         if (!user?.id) return Alert.alert('Hata', 'Önce giriş yapın');
@@ -1092,8 +1281,11 @@ const TokenStoreScreen = ({ navigation }) => {
                       }
                     }}
                     title="Simülasyon: 30 Jeton Ekle"
-                    style={[styles.testButton, { backgroundColor: colors.success }]}
-                    textStyle={[styles.testButtonText, { color: colors.text.light }]}
+                    icon="plus-circle"
+                    iconSize={20}
+                    variant="primary"
+                    style={styles.testButton}
+                    textStyle={styles.testButtonText}
                   />
                 </>
               )}
@@ -1122,30 +1314,68 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingTop: StatusBar.currentHeight + 10,
-    paddingBottom: 15,
+    paddingBottom: 20,
     paddingHorizontal: 20,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    position: 'relative',
+    overflow: 'hidden',
+    shadowColor: colors.secondary,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  headerDecoTop: {
+    position: 'absolute',
+    top: -50,
+    right: -50,
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    backgroundColor: 'rgba(255, 215, 0, 0.1)',
+  },
+  headerDecoBottom: {
+    position: 'absolute',
+    bottom: -30,
+    left: -30,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(255, 215, 0, 0.05)',
   },
   headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    zIndex: 2,
   },
   backButton: {
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  backButtonGradient: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  headerTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+    marginLeft: 12,
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: colors.text.light,
-    marginLeft: 10, // Sola yaslamak için negatif margin
-    flex: 1, // Sola yaslamak için flex ekledim
+    letterSpacing: 0.5,
   },
   headerRight: {
     flexDirection: 'row',
@@ -1155,21 +1385,32 @@ const styles = StyleSheet.create({
   tokenContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderRadius: 20,
+    shadowColor: colors.secondary,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 4,
   },
   tokenText: {
-    color: colors.text.light,
+    color: colors.text.dark,
     fontWeight: 'bold',
     marginLeft: 6,
+    fontSize: 15,
   },
   restoreButton: {
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  restoreButtonGradient: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1227,11 +1468,36 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontStyle: 'italic',
   },
-  banner: {
+  bannerWrapper: {
     marginHorizontal: 20,
     marginTop: 20,
-    borderRadius: 16,
+  },
+  bannerBorder: {
+    borderRadius: 20,
+    padding: 2,
+    shadowColor: colors.secondary,
+    shadowOffset: {
+      width: 0,
+      height: 6,
+    },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  banner: {
+    borderRadius: 18,
     overflow: 'hidden',
+    position: 'relative',
+  },
+  sparkle1: {
+    position: 'absolute',
+    top: 10,
+    right: 20,
+  },
+  sparkle2: {
+    position: 'absolute',
+    bottom: 15,
+    left: 25,
   },
   bannerContent: {
     flexDirection: 'row',
@@ -1241,166 +1507,52 @@ const styles = StyleSheet.create({
   bannerTextContainer: {
     flex: 1,
   },
+  bannerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 8,
+  },
   bannerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: colors.text.light,
-    marginBottom: 5,
+    letterSpacing: 0.3,
   },
   bannerSubtitle: {
-    fontSize: 14,
+    fontSize: 13,
     color: colors.text.secondary,
-    opacity: 0.8,
+    opacity: 0.9,
+    lineHeight: 18,
   },
   bannerImageContainer: {
-    width: 80,
-    height: 80,
+    width: 70,
+    height: 70,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bannerIconGradient: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
     justifyContent: 'center',
     alignItems: 'center',
   },
   bannerImage: {
-    shadowColor: colors.shadow,
+    shadowColor: colors.secondary,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
   },
   // Tab Navigation Styles
-  tabContainer: {
-    flexDirection: 'row',
+  tabWrapper: {
     marginHorizontal: 20,
     marginTop: 25,
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    padding: 4,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
-  tabButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    gap: 8,
-  },
-  activeTabButton: {
-    backgroundColor: colors.secondary,
-  },
-  tabText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text.tertiary,
-  },
-  activeTabText: {
-    color: colors.text.light,
-  },
-  section: {
-    marginTop: 25,
-    paddingHorizontal: 20,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.text.light,
-    marginBottom: 8,
-  },
-  sectionSubtitle: {
-    fontSize: 14,
-    color: colors.text.tertiary,
-    marginBottom: 15,
-  },
-  subscriptionCard: {
-    backgroundColor: colors.card,
+  tabBorder: {
     borderRadius: 16,
-    marginBottom: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    position: 'relative',
-  },
-  popularSubscription: {
-    borderColor: colors.secondary,
-    borderWidth: 2,
-  },
-  popularBadge: {
-    position: 'absolute',
-    top: -10,
-    right: 20,
-    backgroundColor: colors.secondary,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 12,
-    zIndex: 1,
-  },
-  popularText: {
-    color: colors.background,
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  subscriptionCardContent: {
-    flexDirection: 'row',
-    marginBottom: 15,
-  },
-  subscriptionIconSection: {
-    alignItems: 'center',
-    marginRight: 16,
-    width: 80,
-  },
-  subscriptionIconContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  subscriptionIconLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.text.tertiary,
-    textAlign: 'center',
-  },
-  subscriptionInfoSection: {
-    flex: 1,
-  },
-  subscriptionName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.text.light,
-    marginBottom: 4,
-  },
-  subscriptionPrice: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: colors.secondary,
-    marginBottom: 12,
-  },
-  perMonth: {
-    fontSize: 14,
-    fontWeight: 'normal',
-    color: colors.text.tertiary,
-  },
-  subscriptionFeatures: {
-    marginBottom: 15,
-  },
-  featureRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  featureText: {
-    marginLeft: 8,
-    fontSize: 14,
-    color: colors.text.secondary,
-  },
-  subscriptionButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
-    paddingVertical: 12,
-    shadowColor: colors.shadow,
+    padding: 2,
+    shadowColor: colors.secondary,
     shadowOffset: {
       width: 0,
       height: 4,
@@ -1409,146 +1561,140 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 6,
   },
-  subscriptionButtonText: {
-    color: colors.text.dark,
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  packageCard: {
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    marginBottom: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  packageCardContent: {
+  tabContainer: {
     flexDirection: 'row',
-    marginBottom: 15,
+    backgroundColor: colors.card,
+    borderRadius: 14,
+    padding: 6,
+    gap: 8,
   },
-  packageIconSection: {
-    alignItems: 'center',
-    marginRight: 16,
-    width: 80,
+  tabButton: {
+    flex: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
   },
-  packageIconContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+  activeTabButton: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    gap: 8,
+    shadowColor: colors.secondary,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
-  packageTokens: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: colors.text.light,
-    marginTop: 4,
+  inactiveTabButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    gap: 8,
+    backgroundColor: 'transparent',
   },
-  packageIconLabel: {
-    fontSize: 12,
+  tabText: {
+    fontSize: 14,
     fontWeight: '600',
     color: colors.text.tertiary,
-    textAlign: 'center',
   },
-  packageInfoSection: {
-    flex: 1,
-  },
-  packageName: {
-    fontSize: 16,
+  activeTabText: {
+    fontSize: 14,
     fontWeight: 'bold',
-    color: colors.text.light,
-    marginBottom: 4,
-  },
-  packageDescription: {
-    fontSize: 12,
-    color: colors.text.tertiary,
-    marginBottom: 12,
-  },
-  packageFeatures: {
-    marginBottom: 12,
-  },
-  packagePricing: {
-    alignItems: 'flex-start',
-  },
-  packagePrice: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: colors.text.light,
-  },
-  originalPrice: {
-    fontSize: 12,
-    color: colors.text.tertiary,
-    textDecorationLine: 'line-through',
-    marginTop: 2,
-  },
-  discountBadge: {
-    backgroundColor: colors.success,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    marginTop: 4,
-  },
-  discountText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: colors.text.light,
-  },
-  buyButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
-    paddingVertical: 12,
-  },
-  buyButtonText: {
-    fontWeight: 'bold',
-    fontSize: 16,
     color: colors.text.dark,
+    letterSpacing: 0.3,
+  },
+  section: {
+    marginTop: 25,
+    paddingHorizontal: 20,
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 8,
+  },
+  sectionTitle: {
+    fontSize: 19,
+    fontWeight: 'bold',
+    color: colors.text.light,
+    letterSpacing: 0.3,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    color: colors.text.tertiary,
+    marginBottom: 18,
+    lineHeight: 20,
   },
   reasonsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    gap: 10,
+  },
+  reasonCardWrapper: {
+    flex: 1,
+  },
+  reasonCardBorder: {
+    borderRadius: 16,
+    padding: 2,
+    shadowColor: colors.secondary,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 5,
   },
   reasonCard: {
-    width: '31%',
     backgroundColor: colors.card,
-    borderRadius: 16,
-    padding: 12,
+    borderRadius: 14,
+    padding: 16,
     alignItems: 'center',
+    minHeight: 150,
   },
   reasonIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
+    shadowColor: colors.secondary,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
   reasonTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: 'bold',
     color: colors.text.light,
-    marginBottom: 5,
+    marginBottom: 6,
     textAlign: 'center',
+    letterSpacing: 0.2,
   },
   reasonText: {
-    fontSize: 12,
+    fontSize: 11,
     color: colors.text.tertiary,
     textAlign: 'center',
+    lineHeight: 16,
   },
   testContainer: {
     gap: 10,
   },
   testButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    alignItems: 'center',
     marginBottom: 8,
   },
   testButtonText: {
-    color: colors.text.light,
-    fontWeight: 'bold',
     fontSize: 14,
   },
   noPackagesContainer: {
